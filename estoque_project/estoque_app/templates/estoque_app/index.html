@@ -1,0 +1,31 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Controle de Estoque</title>
+</head>
+<body>
+    <h1>Controle de Estoque</h1>
+
+    {% if mensagem %}
+        <p style="color:green;">{{ mensagem }}</p>
+    {% endif %}
+
+    <h2>Produtos</h2>
+    <ul>
+        {% for produto in produtos %}
+            <li>{{ produto.nome }} - Quantidade: {{ produto.quantidade }}</li>
+        {% empty %}
+            <li>Nenhum produto cadastrado.</li>
+        {% endfor %}
+    </ul>
+
+    <h2>Adicionar Produto</h2>
+    <form method="POST" action="/adicionar/">
+        {% csrf_token %}
+        Nome: <input type="text" name="nome"><br>
+        Quantidade: <input type="text" name="quantidade"><br>
+        <button type="submit">Adicionar</button>
+    </form>
+</body>
+</html>

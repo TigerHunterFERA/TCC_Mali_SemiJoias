@@ -1,0 +1,123 @@
+<!-- {% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Estoque</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+<h1>Adicionar Novo Produto</h1>
+<form method="POST" class="form-container">
+    {% csrf_token %}
+    <label>Nome do Produto</label>
+    <input type="text" name="nome" required>
+
+    <label>Tipo do Produto</label>
+    <input type="text" name="tipo" placeholder="Ex: anel, colar...">
+
+    <label>Categoria</label>
+    <input type="text" name="categoria">
+
+    <label>Banho</label>
+    <select name="banho">
+        <option>Ouro</option>
+        <option>Prata</option>
+    </select>
+
+    <label>Peso (g)</label>
+    <input type="number" name="peso" value="0">
+
+    <label>Preço (R$)</label>
+    <input type="number" step="0.01" name="preco" value="0">
+
+    <label>Estoque</label>
+    <input type="number" name="quantidade" value="0">
+
+    <label>URL da Imagem</label>
+    <input type="url" name="imagem" placeholder="https://...">
+
+    <label>Descrição</label>
+    <textarea name="descricao"></textarea>
+
+    <button type="submit" class="btn-gradient">Adicionar Produto</button>
+    <a href="{% url 'produtos' %}" class="btn cancelar">Cancelar</a>
+</form>
+</body>
+</html> -->
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Adicionar Produto</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <!-- Sidebar fixa -->
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="#">⚙️ Configurações</a>
+    </nav>
+
+    <!-- Área principal -->
+    <main class="main-content">
+        <header>
+            <h1>Adicionar Novo Produto</h1>
+        </header>
+
+        <!-- Card estilizado -->
+        <div class="card">
+            <form method="POST" class="form-container">
+                {% csrf_token %}
+                <label>Nome do Produto</label>
+                <input type="text" name="nome" required>
+                <br>
+
+                <label>Tipo do Produto</label>
+                <input type="text" name="tipo" placeholder="Ex: anel, colar...">
+                <br>
+
+                <label>Categoria</label>
+                <input type="text" name="categoria">
+                <br>
+
+                <label>Banho</label>
+                <select name="banho">
+                    <option>Ouro</option>
+                    <option>Prata</option>
+                </select>
+                <br>
+
+                <label>Peso (g)</label>
+                <input type="number" name="peso" value="0">
+                <br>
+
+                <label>Preço (R$)</label>
+                <input type="number" step="0.01" name="preco" value="0">
+                <br>
+
+                <label>Estoque</label>
+                <input type="number" name="quantidade" value="0">
+                <br>
+
+                <label>URL da Imagem</label>
+                <input type="url" name="imagem" placeholder="https://...">
+                <br>
+
+                <label>Descrição</label>
+                <textarea name="descricao"></textarea>
+                <br>
+
+                <button type="submit" class="btn-mali">Adicionar Produto</button>
+                <a href="{% url 'produtos' %}" class="btn-mali" style="background:#ccc; color:#333;">Cancelar</a>
+            </form>
+        </div>
+    </main>
+</body>
+</html>
+

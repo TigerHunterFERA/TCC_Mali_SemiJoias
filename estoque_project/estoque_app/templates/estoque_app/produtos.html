@@ -1,0 +1,104 @@
+<!-- <h1>Gerenciar Produtos</h1>
+<div class="top-bar">
+    <input type="text" placeholder="Buscar produtos..." class="search-bar">
+    <a href="/adicionar/" class="btn-gradient">+ Novo Produto</a>
+</div>
+
+<div class="cards">
+    {% for produto in produtos %}
+    <div class="card">
+        <img src="{{ produto.imagem }}" alt="{{ produto.nome }}" class="card-img">
+        <h3>{{ produto.nome }}</h3>
+        <p>{{ produto.descricao }}</p>
+        <p><strong>Preço:</strong> R$ {{ produto.preco }}</p>
+        <p><strong>Estoque:</strong> {{ produto.quantidade }}</p>
+        <div class="card-actions">
+            <a href="/editar/{{ produto.id }}/" class="btn editar">Editar</a>
+            <a href="/remover/{{ produto.id }}/" class="btn remover">Remover</a>
+        </div>
+    </div>
+    {% endfor %}
+</div> -->
+
+<!-- <div class="top-bar">
+    <input type="text" placeholder="Buscar produtos..." class="search-bar">
+    <a href="{% url 'adicionar' %}" class="btn-gradient">+ Novo Produto</a>
+</div>
+
+<div class="cards">
+    {% for produto in produtos %}
+    <div class="card">
+        <img src="{{ produto.imagem }}" alt="{{ produto.nome }}" class="card-img">
+        <h3>{{ produto.nome }}</h3>
+        <p>{{ produto.descricao }}</p>
+        <p><strong>Preço:</strong> R$ {{ produto.preco }}</p>
+        <p><strong>Estoque:</strong> {{ produto.quantidade }}</p>
+        <div class="card-actions">
+            <a href="{% url 'editar' produto.id %}" class="btn editar">Editar</a>
+            <a href="{% url 'remover' produto.id %}" class="btn remover">Remover</a>
+        </div>
+    </div>
+    {% endfor %}
+</div> -->
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Estoque</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="#">⚙️ Configurações</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+            <div>
+                <h1>Gerenciar Produtos</h1>
+                <p style="margin-top:6px; color:#6f6f6f;">Controle de inventário</p>
+            </div>
+            <a href="{% url 'adicionar' %}" class="btn-mali">+ Novo Produto</a>
+        </header>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Preço</th>
+                        <th>Estoque</th>
+                        <th style="text-align:right;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for produto in produtos %}
+                    <tr>
+                        <td style="font-weight: 700;">{{ produto.nome }}</td>
+                        <td>{{ produto.categoria }}</td>
+                        <td>R$ {{ produto.preco }}</td>
+                        <td>{{ produto.estoque }}</td>
+                        <td style="text-align:right;">
+                            <a href="{% url 'editar' produto.id %}" class="btn-mali" style="text-decoration:none; padding:8px 12px;">✏️</a>
+                            <a href="{% url 'remover' produto.id %}" class="btn-mali" style="text-decoration:none; padding:8px 12px; background:#ff5e9e; margin-left:10px;" onclick="return confirm('Deseja excluir este item?')">🗑️</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align:center; padding:30px;">Nenhum produto cadastrado no momento.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+</body>
+</html>

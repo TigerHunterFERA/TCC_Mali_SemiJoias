@@ -1,0 +1,100 @@
+<!-- <!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Estoque</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+<h1>Editar Produto</h1>
+<form method="POST" class="form-container">
+    {% csrf_token %}
+    <label for="nome">Nome:</label>
+    <input type="text" id="nome" name="nome" value="{{ produto.nome }}" required>
+
+    <label for="quantidade">Quantidade:</label>
+    <input type="number" id="quantidade" name="quantidade" value="{{ produto.quantidade }}" required>
+
+    <label for="preco">Preço:</label>
+    <input type="number" id="preco" name="preco" value="{{ produto.preco }}" required>
+
+    <label for="imagem">Imagem:</label>
+    <input type="url" id="imagem" name="imagem" value="{{ produto.imagem }}" placeholder="https://...">
+
+    <label for="descricao">Descriçao:</label>
+    <input type="text" id="descricao" name="descricao" value="{{ produto.descricao }}" required>
+
+    <button type="submit">Atualizar</button>
+</form>
+{% if mensagem %}<p class="erro">{{ mensagem }}</p>{% endif %}
+</body>
+</html> -->
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Editar Produto</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <!-- Sidebar fixa -->
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+    </nav>
+
+    <!-- Área principal -->
+    <main class="main-content">
+        <header>
+            <h1>Editar Produto</h1>
+        </header>
+
+        <!-- Card estilizado -->
+        <div class="card">
+            <form method="POST" class="form-container">
+                {% csrf_token %}
+
+                <label>Nome do Produto</label>
+                <input type="text" name="nome" value="{{ produto.nome }}" required><br>
+
+                <label>Tipo do Produto</label>
+                <input type="text" name="tipo" value="{{ produto.tipo }}" placeholder="Ex: anel, colar..."><br>
+
+                <label>Categoria</label>
+                <input type="text" name="categoria" value="{{ produto.categoria }}"><br>
+
+                <label>Banho</label>
+                <select name="banho">
+                    <option {% if produto.banho == "Ouro" %}selected{% endif %}>Ouro</option>
+                    <option {% if produto.banho == "Prata" %}selected{% endif %}>Prata</option>
+                </select><br>
+
+                <label>Peso (g)</label>
+                <input type="number" name="peso" value="{{ produto.peso|default:0 }}"><br>
+
+                <label>Preço (R$)</label>
+                <input type="number" step="0.01" name="preco" value="{{ produto.preco }}" required><br>
+
+                <label>Estoque</label>
+                <input type="number" name="quantidade" value="{{ produto.estoque }}" required><br>
+
+                <label>URL da Imagem</label>
+                <input type="url" name="imagem" value="{{ produto.imagem }}" placeholder="https://..."><br>
+                <label>Descrição</label>
+                <textarea name="descricao">{{ produto.descricao }}</textarea><br>
+
+                <button type="submit" class="btn-mali">Salvar Alterações</button>
+                <a href="{% url 'produtos' %}" class="btn-mali" style="background:#ccc; color:#333;">Cancelar</a>
+            </form>
+
+            {% if mensagem %}
+                <p class="erro">{{ mensagem }}</p>
+            {% endif %}
+        </div>
+    </main>
+</body>
+</html>

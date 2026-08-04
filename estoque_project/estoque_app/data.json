@@ -1,0 +1,28 @@
+{
+    "produtos": [
+        {
+            "id": 1,
+            "nome": "pulseira riviera",
+            "quantidade": 2,
+            "preco": 220.0,
+            "imagem": "",
+            "descricao": "pulseira riviera"
+        },
+        {
+            "id": 2,
+            "nome": "Brinco de diamente negro",
+            "quantidade": 4,
+            "preco": 125.0,
+            "imagem": "",
+            "descricao": ""
+        },
+        {
+            "id": 3,
+            "nome": "Brinco de diamente vermelho",
+            "quantidade": 3,
+            "preco": 150.0,
+            "imagem": "",
+            "descricao": "Brinco para quem quer se destacar"
+        }
+    ]
+}

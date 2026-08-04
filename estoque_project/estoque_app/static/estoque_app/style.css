@@ -1,0 +1,547 @@
+/* body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+    margin: 0;
+    padding: 0;
+}
+
+.sidebar {
+    width: 200px;
+    background: #007bff;
+    color: white;
+    position: fixed;
+    height: 100%;
+    padding: 20px;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+}
+
+.sidebar ul li {
+    margin: 15px 0;
+}
+
+.sidebar ul li a {
+    color: white;
+    text-decoration: none;
+}
+
+.main-content {
+    margin-left: 220px;
+    padding: 20px;
+}
+
+.form-container {
+    margin: 50px auto;
+    width: 400px;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px #ccc;
+} */
+/* 
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background-color: #f4f6f9;
+    margin: 0;
+    padding: 0;
+}
+
+.login-page, .form-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+.login-box, .form-container {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    width: 300px;
+}
+
+input, button {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+.sidebar {
+    width: 200px;
+    background: #007bff;
+    color: white;
+    position: fixed;
+    height: 100%;
+    padding: 20px;
+}
+
+.sidebar ul {
+    list-style: none;
+    padding: 0;
+}
+
+.sidebar ul li {
+    margin: 15px 0;
+}
+
+.sidebar ul li a {
+    color: white;
+    text-decoration: none;
+}
+
+.main-content {
+    margin-left: 220px;
+    padding: 20px;
+}
+
+.cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.btn-gradient {
+    background: linear-gradient(90deg, #ff4d6d, #ff9966);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+}
+.card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    padding: 20px;
+    width: 250px;
+    margin: 15px;
+    text-align: center;
+}
+.card-img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 8px;
+}
+.card-actions {
+    margin-top: 10px;
+}
+
+.tabela-produtos {
+    width: 80%;
+    margin: 20px auto;
+    border-collapse: collapse;
+}
+
+.tabela-produtos th, .tabela-produtos td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+}
+
+.tabela-produtos th {
+    background-color: #007bff;
+    color: white;
+}
+
+.btn {
+    padding: 5px 10px;
+    border-radius: 5px;
+    text-decoration: none;
+    margin: 0 5px;
+}
+
+.btn.editar { background: #007bff; color: white; padding: 5px 10px; border-radius: 5px; text-decoration: none; }
+.btn.remover { background: #dc3545; color: white; padding: 5px 10px; border-radius: 5px; text-decoration: none; } */
+
+/* Reset básico para garantir que tudo fique igual em qualquer navegador */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+}
+
+:root {
+    --primaria-gradiente: linear-gradient(135deg, #FF4D6D 0%, #FF9966 100%);
+    --cor-fundo: #FDF2F4;
+    --cor-texto: #333;
+    --branco: #ffffff;
+    --borda-raio: 12px;
+}
+
+/* body {
+    background-color: var(--cor-fundo);
+    color: var(--cor-texto);
+    display: flex;
+    min-height: 100vh;
+} */
+
+/* Sidebar lateral fixa como no dashboard do Figma */
+
+/* Estilo geral inspirado no Figma Maker */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: flex-start;
+    align-items: stretch;
+    min-height: 100vh;
+}
+
+.login-page {
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.erro {
+    color: #fa5252;
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+.sidebar {
+    width: 260px;
+    background: var(--primaria-gradiente);
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    color: var(--branco);
+    position: fixed;
+    height: 100%;
+}
+
+.sidebar h2 {
+    font-size: 1.5rem;
+    margin-bottom: 40px;
+    text-align: center;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.sidebar a {
+    color: var(--branco);
+    text-decoration: none;
+    padding: 12px 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    font-weight: 500;
+}
+
+.sidebar a:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Área principal de conteúdo */
+.main-content {
+    margin-left: 260px;
+    flex: 1;
+    padding: 40px;
+}
+
+header {
+    margin-bottom: 30px;
+}
+
+.page-header {
+    margin-bottom: 30px;
+}
+
+h1 {
+    font-size: 2rem;
+    color: #FF4D6D;
+}
+
+/* Cards do Dashboard */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.metric-card {
+    background: var(--branco);
+    border-radius: var(--borda-raio);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    padding: 22px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    border-left: 5px solid rgba(255, 77, 109, 0.6);
+}
+
+.metric-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 77, 109, 0.08);
+    font-size: 1.2rem;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    color: #6f6f6f;
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.card {
+    background: var(--branco);
+    padding: 25px;
+    border-radius: var(--borda-raio);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    border-left: 5px solid #FF4D6D;
+}
+
+.card h3 {
+    font-size: 0.9rem;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.card .valor {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-top: 10px;
+    color: #333;
+}
+
+/* Tabela de Produtos Estilizada */
+.table-container {
+    background: var(--branco);
+    padding: 20px;
+    border-radius: var(--borda-raio);
+    margin-top: 30px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    text-align: left;
+    padding: 15px;
+    border-bottom: 2px solid #eee;
+    color: #666;
+}
+
+td {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.quick-actions {
+    margin-top: 26px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+}
+
+.action-card {
+    background: var(--branco);
+    border-radius: var(--borda-raio);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    padding: 18px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.action-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.08);
+}
+
+.action-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 153, 102, 0.12);
+    font-size: 1.25rem;
+}
+
+.action-title {
+    font-weight: 700;
+}
+
+.action-subtitle {
+    margin-top: 2px;
+    font-size: 0.9rem;
+    color: #6f6f6f;
+}
+
+/* Container principal com efeito de vidro (Glassmorphism) */
+.glass-container {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 20px;
+    padding: 30px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    width: 90%;
+    max-width: 1000px;
+}
+
+/* Botões com o degradê do Figma
+.btn-mali {
+    background: var(--primaria-gradiente);
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    text-decoration: none;
+    display: inline-block;
+    transition: transform 0.2s;
+} */
+
+
+/* Botões simples com funções claras */
+.btn-mali {
+    background-color: #ff7eb3;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+
+/* .btn-mali:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(255, 77, 109, 0.4);
+}
+ */
+
+.btn-mali:hover {
+    background-color: #ff5e9e;
+}
+
+/* Container do formulário em Grid */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Divide em duas colunas iguais */
+    gap: 20px; /* Espaço entre os campos */
+    margin-top: 20px;
+}
+
+/* Faz campos como 'Nome' e 'Descrição' ocuparem a linha inteira se necessário */
+.full-width {
+    grid-column: span 2;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+    padding: 12px;
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    font-size: 1rem;
+    outline: none;
+    transition: 0.3s;
+}
+
+.form-group input:focus {
+    border-color: #FF4D6D;
+    background-color: #fff;
+    box-shadow: 0 0 0 3px rgba(255, 77, 109, 0.1);
+}
+
+/* Estilo do botão para ficar grande e centralizado no final */
+.form-actions {
+    grid-column: span 2;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+/* Login (mantém o visual do figma maker) */
+.login-box {
+    background: rgba(255, 255, 255, 0.92);
+    border-radius: 22px;
+    padding: 34px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+}
+
+.login-box h2 {
+    text-align: center;
+    margin-bottom: 18px;
+    color: #FF4D6D;
+    font-size: 1.6rem;
+}
+
+.login-box input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid #e8e8e8;
+    background: #fff;
+    outline: none;
+    margin-top: 12px;
+}
+
+.login-box button {
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: none;
+    background: var(--primaria-gradiente);
+    color: #fff;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.login-box button:hover {
+    filter: brightness(0.96);
+}

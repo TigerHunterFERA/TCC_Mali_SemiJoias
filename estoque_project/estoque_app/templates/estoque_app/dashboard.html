@@ -1,0 +1,165 @@
+<!-- <div class="sidebar">
+    <h2>Menu</h2>
+    <ul>
+        <li><a href="/dashboard/">Dashboard</a></li>
+        <li><a href="/produtos/">Produtos</a></li>
+        <li><a href="/adicionar/">Adicionar Produto</a></li>
+    </ul>
+</div>
+<div class="main-content">
+    <h1>Resumo do Estoque</h1>
+    <div class="cards">
+        {% for produto in produtos %}
+        <div class="card">
+            <h3>{{ produto.nome }}</h3>
+            <p>{{ produto.quantidade }} unidades</p>
+        </div>
+        {% endfor %}
+    </div>
+</div> -->
+
+<!-- <div class="dashboard">
+    <div class="card metric">Total de Produtos: {{ produtos|length }}</div>
+    <div class="card metric">Pedidos Hoje: 0</div>
+    <div class="card metric">Receita Total: R$ 0,00</div>
+    <div class="card metric">Estoque Baixo: 0</div>
+</div>
+
+<div class="actions">
+    <a href="{% url 'produtos' %}" class="btn-gradient">Produtos</a>
+    <a href="#" class="btn-gradient">Pedidos</a>
+    <a href="#" class="btn-gradient">Chatbot</a>
+</div> -->
+<!-- {% load static %} -->
+ 
+<!-- <!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Adicionar Produto</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+    </nav>
+
+    <main class="main-content">
+        <header>
+            <h1>Adicionar Novo Produto</h1>
+        </header>
+
+        <div class="card">
+            <form method="POST">
+                {% csrf_token %}
+                <label>Nome do Produto</label>
+                <input type="text" name="nome" required>
+
+                <label>Quantidade</label>
+                <input type="number" name="quantidade" required>
+
+                <label>Preço (R$)</label>
+                <input type="number" step="0.01" name="preco" required>
+
+                <label>URL da Imagem</label>
+                <input type="url" name="imagem">
+
+                <label>Descrição</label>
+                <textarea name="descricao"></textarea>
+
+                <button type="submit" class="btn-mali">Adicionar Produto</button>
+                <a href="{% url 'produtos' %}" class="btn-mali" style="background:#ccc; color:#333;">Cancelar</a>
+            </form>
+        </div>
+    </main>
+</body>
+</html> -->
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Dashboard</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="#">⚙️ Configurações</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header">
+            <h1>Bem-vindo à Mali Semijoias</h1>
+            {% if erro_db %}
+                <p class="erro">Erro ao conectar no banco: {{ erro_db }}</p>
+            {% endif %}
+        </header>
+
+        <section class="dashboard-grid">
+            <div class="metric-card">
+                <div class="metric-icon">📦</div>
+                <div>
+                    <div class="metric-label">Total de Produtos</div>
+                    <div class="metric-value">{{ total_produtos|default:0 }}</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon">🗓️</div>
+                <div>
+                    <div class="metric-label">Pedidos Hoje</div>
+                    <div class="metric-value">{{ pedidos_hoje|default:0 }}</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon">💰</div>
+                <div>
+                    <div class="metric-label">Receita Total</div>
+                    <div class="metric-value">R$ {{ receita_total|default:0 }}</div>
+                </div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-icon">⚠️</div>
+                <div>
+                    <div class="metric-label">Estoque Baixo</div>
+                    <div class="metric-value">{{ estoque_baixo|default:0 }}</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="quick-actions">
+            <a href="{% url 'produtos' %}" class="action-card">
+                <div class="action-icon">📦</div>
+                <div>
+                    <div class="action-title">Produtos</div>
+                    <div class="action-subtitle">Gerenciar catálogo</div>
+                </div>
+            </a>
+
+            <a href="#" class="action-card">
+                <div class="action-icon">🧾</div>
+                <div>
+                    <div class="action-title">Pedidos</div>
+                    <div class="action-subtitle">Ver vendas realizadas</div>
+                </div>
+            </a>
+
+            <a href="#" class="action-card">
+                <div class="action-icon">💬</div>
+                <div>
+                    <div class="action-title">Chatbot</div>
+                    <div class="action-subtitle">Interface de vendas</div>
+                </div>
+            </a>
+        </section>
+    </main>
+</body>
+</html>
