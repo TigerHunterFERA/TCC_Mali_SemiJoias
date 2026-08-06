@@ -87,7 +87,10 @@
                         <td>{{ produto.estoque }}</td>
                         <td style="text-align:right;">
                             <a href="{% url 'editar' produto.id %}" class="btn-mali" style="text-decoration:none; padding:8px 12px;">✏️</a>
-                            <a href="{% url 'remover' produto.id %}" class="btn-mali" style="text-decoration:none; padding:8px 12px; background:#ff5e9e; margin-left:10px;" onclick="return confirm('Deseja excluir este item?')">🗑️</a>
+                            <form action="{% url 'remover' produto.id %}" method="post" style="display:inline; margin-left:10px;" onsubmit="return confirm('Deseja excluir este item?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn-mali" style="border:none; cursor:pointer; padding:8px 12px; background:#ff5e9e;">🗑️</button>
+                            </form>
                         </td>
                     </tr>
                     {% empty %}

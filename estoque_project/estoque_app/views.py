@@ -77,6 +77,7 @@
 #     return redirect("produtos")
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
 from .models import Produto
 # from django.shortcuts import render, redirect
 import json
@@ -213,6 +214,7 @@ def editar_produto(request, produto_id):
 
     return render(request, "estoque_app/editar.html", {"produto": produto})
 
+@require_POST
 def remover_produto(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
     produto.delete()
