@@ -70,6 +70,12 @@
             <h1>Adicionar Novo Produto</h1>
         </header>
 
+        {% if erro %}
+            <p style="color: red; font-weight: bold;">
+                {{ erro }}
+            </p>
+        {% endif %}
+
         <!-- Card estilizado -->
         <div class="card">
             <form method="POST" class="form-container">
@@ -104,11 +110,11 @@
                 <br>
 
                 <label>Preço (R$)</label>
-                <input type="number" step="0.01" name="preco" value="0">
+                <input type="number" step="0.01" min="0" name="preco" required>
                 <br>
 
                 <label>Estoque</label>
-                <input type="number" name="quantidade" value="0">
+                <input type="number" min="0" name="quantidade" required>
                 <br>
 
                 <label>URL da Imagem</label>

@@ -88,7 +88,7 @@
                         <td>{{ produto.descricao|default:"-" }}</td>
                         <td>{{ produto.categoria }}</td>
                         <td>{% if produto.banho %}{{ produto.banho.nome }}{% else %}-{% endif %}</td>
-                        <td>{% if produto.peso %}{{ produto.peso }}{% else %}-{% endif %}</td>
+                        <td>{% if produto.peso is not None %}{{ produto.peso }}{% else %}-{% endif %}</td>
                         <td>R$ {{ produto.preco }}</td>
                         <td>{{ produto.estoque }}</td>
                         <td style="text-align:right;">
@@ -101,7 +101,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" style="text-align:center; padding:30px;">Nenhum produto cadastrado no momento.</td>
+                        <td colspan="8" style="text-align:center; padding:30px;">Nenhum produto cadastrado no momento.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

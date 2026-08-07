@@ -79,9 +79,45 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from .models import Produto, TipoBanho
+from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
 import json
 
+def validar_produto(request):
+    nome = (request.POST.get("nome") or "").strip()
+    preco_texto = (request.POST.get("preco") or "").strip()
+    estoque_texto = (request.POST.get("quantidade") or "").strip()
+    peso_texto = (request.POST.get("peso") or "").strip()
+
+    if not nome:
+        return "O nome do produto é obrigatório."
+
+    try:
+        preco = Decimal(preco_texto)
+    except (InvalidOperation, ValueError):
+        return "Informe um preço válido."
+
+    if preco < 0:
+        return "O preço não pode ser negativo."
+
+    try:
+        estoque = int(estoque_texto)
+    except ValueError:
+        return "Informe uma quantidade válida."
+
+    if estoque < 0:
+        return "A quantidade em estoque não pode ser negativa."
+
+    if peso_texto:
+        try:
+            peso = Decimal(peso_texto)
+        except (InvalidOperation, ValueError):
+            return "Informe um peso válido."
+
+        if peso < 0:
+            return "O peso não pode ser negativo."
+
+    return None
 
 def obter_peso_do_formulario(request):
     """Converte o peso do formulário. Campo vazio vira None."""
@@ -97,16 +133,25 @@ def obter_banho_do_formulario(request):
     Prioridade: campo "novo_banho"; senão, select de banho existente.
     """
     novo_nome = (request.POST.get("novo_banho") or "").strip()
+
     if novo_nome:
-        banho, _criado = TipoBanho.objects.get_or_create(nome=novo_nome)
-        return banho
+        banho_existente = TipoBanho.objects.filter(
+            nome__iexact=novo_nome
+        ).first()
+
+        if banho_existente:
+            return banho_existente
+
+        return TipoBanho.objects.create(nome=novo_nome)
 
     banho_id = request.POST.get("banho")
+
     if banho_id:
         try:
             return TipoBanho.objects.get(id=banho_id)
         except (TipoBanho.DoesNotExist, ValueError):
             return None
+
     return None
 
 def login(request):
@@ -215,8 +260,21 @@ def listar_produtos(request):
 
 def adicionar_produto(request):
     if request.method == "POST":
+        erro = validar_produto(request)
+
+        if erro:
+            tipos_banho = TipoBanho.objects.all().order_by("nome")
+
+            return render(
+                request,
+                "estoque_app/adicionar.html",
+                {
+                    "tipos_banho": tipos_banho,
+                    "erro": erro,
+                },
+            )
         Produto.objects.create(
-            nome=request.POST.get("nome"),
+            nome=(request.POST.get("nome") or "").strip(),
             descricao=request.POST.get("descricao"),
             preco=request.POST.get("preco"),
             estoque=request.POST.get("quantidade"),
@@ -234,7 +292,21 @@ def editar_produto(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
 
     if request.method == "POST":
-        produto.nome = request.POST.get("nome")
+        erro = validar_produto(request)
+
+        if erro:
+            tipos_banho = TipoBanho.objects.all().order_by("nome")
+
+            return render(
+                request,
+                "estoque_app/editar.html",
+                {
+                    "produto": produto,
+                    "tipos_banho": tipos_banho,
+                    "erro": erro,
+                },
+            )
+        produto.nome = (request.POST.get("nome") or "").strip()
         produto.descricao = request.POST.get("descricao")
         produto.preco = request.POST.get("preco")
         produto.estoque = request.POST.get("quantidade")
