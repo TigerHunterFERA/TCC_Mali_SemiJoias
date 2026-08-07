@@ -68,7 +68,37 @@ class Produto(models.Model):
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = 'produtos' 
+        db_table = 'produtos'
+
+    def __str__(self):
+        return self.nome
+
+
+class MovimentacaoEstoque(models.Model):
+    """Histórico simples de entradas e saídas de estoque."""
+
+    TIPO_ENTRADA = "entrada"
+    TIPO_SAIDA = "saida"
+    TIPOS = [
+        (TIPO_ENTRADA, "Entrada"),
+        (TIPO_SAIDA, "Saída"),
+    ]
+
+    produto = models.ForeignKey(
+        Produto,
+        on_delete=models.PROTECT,
+        related_name="movimentacoes",
+    )
+    tipo = models.CharField(max_length=10, choices=TIPOS)
+    quantidade = models.PositiveIntegerField()
+    data = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "movimentacoes_estoque"
+
+    def __str__(self):
+        return f"{self.tipo} - {self.produto.nome} ({self.quantidade})"
+
 
 class Pedido(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE)

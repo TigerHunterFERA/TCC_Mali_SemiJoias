@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Movimentar Estoque</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="{% url 'movimentacoes' %}">📦 Movimentações</a>
+    </nav>
+
+    <main class="main-content">
+        <header>
+            <h1>Movimentar Estoque</h1>
+            <p style="margin-top:6px; color:#6f6f6f;">
+                Produto: <strong>{{ produto.nome }}</strong> —
+                Estoque atual: <strong>{{ produto.estoque }}</strong>
+            </p>
+        </header>
+
+        {% if erro %}
+            <p style="color: red; font-weight: bold;">
+                {{ erro }}
+            </p>
+        {% endif %}
+
+        <div class="card">
+            <form method="POST" class="form-container">
+                {% csrf_token %}
+
+                <label>Tipo de movimentação</label>
+                <select name="tipo" required>
+                    <option value="">-- Selecione --</option>
+                    <option value="entrada">Entrada</option>
+                    <option value="saida">Saída</option>
+                </select><br>
+
+                <label>Quantidade</label>
+                <input type="number" name="quantidade" min="1" required placeholder="Ex: 5"><br>
+
+                <button type="submit" class="btn-mali">Registrar movimentação</button>
+                <a href="{% url 'produtos' %}" class="btn-mali" style="background:#ccc; color:#333;">Cancelar</a>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

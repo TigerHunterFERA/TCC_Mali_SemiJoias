@@ -64,7 +64,10 @@
                 <h1>Gerenciar Produtos</h1>
                 <p style="margin-top:6px; color:#6f6f6f;">Controle de inventário</p>
             </div>
-            <a href="{% url 'adicionar' %}" class="btn-mali">+ Novo Produto</a>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <a href="{% url 'movimentacoes' %}" class="btn-mali" style="background:#ccc; color:#333;">Histórico</a>
+                <a href="{% url 'adicionar' %}" class="btn-mali">+ Novo Produto</a>
+            </div>
         </header>
 
         <div class="table-container">
@@ -92,6 +95,7 @@
                         <td>R$ {{ produto.preco }}</td>
                         <td>{{ produto.estoque }}</td>
                         <td style="text-align:right;">
+                            <a href="{% url 'movimentar' produto.id %}" class="btn-mali" style="text-decoration:none; padding:8px 12px;" title="Movimentar estoque">📦</a>
                             <a href="{% url 'editar' produto.id %}" class="btn-mali" style="text-decoration:none; padding:8px 12px;">✏️</a>
                             <form action="{% url 'remover' produto.id %}" method="post" style="display:inline; margin-left:10px;" onsubmit="return confirm('Deseja excluir este item?');">
                                 {% csrf_token %}

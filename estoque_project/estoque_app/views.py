@@ -78,7 +78,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-from .models import Produto, TipoBanho
+from .models import Produto, TipoBanho, MovimentacaoEstoque
 from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
 import json
@@ -329,3 +329,72 @@ def remover_produto(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
     produto.delete()
     return redirect("produtos")
+
+
+def validar_movimentacao(request, produto):
+    """Valida tipo e quantidade da movimentação. Retorna mensagem de erro ou None."""
+    tipo = (request.POST.get("tipo") or "").strip()
+    quantidade_texto = (request.POST.get("quantidade") or "").strip()
+
+    tipos_validos = [MovimentacaoEstoque.TIPO_ENTRADA, MovimentacaoEstoque.TIPO_SAIDA]
+    if tipo not in tipos_validos:
+        return "Selecione um tipo de movimentação válido."
+
+    try:
+        quantidade = int(quantidade_texto)
+    except ValueError:
+        return "Informe uma quantidade válida."
+
+    if quantidade <= 0:
+        return "A quantidade deve ser maior que zero."
+
+    if tipo == MovimentacaoEstoque.TIPO_SAIDA and quantidade > produto.estoque:
+        return "Quantidade maior que o estoque disponível."
+
+    return None
+
+
+def movimentar_estoque(request, produto_id):
+    produto = get_object_or_404(Produto, id=produto_id)
+
+    if request.method == "POST":
+        erro = validar_movimentacao(request, produto)
+
+        if erro:
+            return render(
+                request,
+                "estoque_app/movimentar.html",
+                {"produto": produto, "erro": erro},
+            )
+
+        tipo = request.POST.get("tipo")
+        quantidade = int(request.POST.get("quantidade"))
+
+        if tipo == MovimentacaoEstoque.TIPO_ENTRADA:
+            produto.estoque = produto.estoque + quantidade
+        else:
+            produto.estoque = produto.estoque - quantidade
+
+        produto.save()
+
+        MovimentacaoEstoque.objects.create(
+            produto=produto,
+            tipo=tipo,
+            quantidade=quantidade,
+        )
+
+        return redirect("movimentacoes")
+
+    return render(request, "estoque_app/movimentar.html", {"produto": produto})
+
+
+def listar_movimentacoes(request):
+    movimentacoes = (
+        MovimentacaoEstoque.objects.select_related("produto")
+        .order_by("-data")
+    )
+    return render(
+        request,
+        "estoque_app/movimentacoes.html",
+        {"movimentacoes": movimentacoes},
+    )

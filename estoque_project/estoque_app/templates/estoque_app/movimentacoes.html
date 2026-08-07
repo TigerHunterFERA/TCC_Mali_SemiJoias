@@ -1,0 +1,62 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Movimentações</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="{% url 'movimentacoes' %}">📦 Movimentações</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+            <div>
+                <h1>Histórico de Movimentações</h1>
+                <p style="margin-top:6px; color:#6f6f6f;">Entradas e saídas de estoque</p>
+            </div>
+            <a href="{% url 'produtos' %}" class="btn-mali">Voltar aos produtos</a>
+        </header>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Produto</th>
+                        <th>Tipo</th>
+                        <th>Quantidade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mov in movimentacoes %}
+                    <tr>
+                        <td>{{ mov.data|date:"d/m/Y H:i" }}</td>
+                        <td style="font-weight: 700;">{{ mov.produto.nome }}</td>
+                        <td>
+                            {% if mov.tipo == "entrada" %}
+                                Entrada
+                            {% else %}
+                                Saída
+                            {% endif %}
+                        </td>
+                        <td>{{ mov.quantidade }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" style="text-align:center; padding:30px;">
+                            Nenhuma movimentação registrada.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>
