@@ -78,9 +78,36 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-from .models import Produto
+from .models import Produto, TipoBanho
 # from django.shortcuts import render, redirect
 import json
+
+
+def obter_peso_do_formulario(request):
+    """Converte o peso do formulário. Campo vazio vira None."""
+    peso = request.POST.get("peso")
+    if peso is None or str(peso).strip() == "":
+        return None
+    return peso
+
+
+def obter_banho_do_formulario(request):
+    """
+    Obtém o TipoBanho a partir do formulário.
+    Prioridade: campo "novo_banho"; senão, select de banho existente.
+    """
+    novo_nome = (request.POST.get("novo_banho") or "").strip()
+    if novo_nome:
+        banho, _criado = TipoBanho.objects.get_or_create(nome=novo_nome)
+        return banho
+
+    banho_id = request.POST.get("banho")
+    if banho_id:
+        try:
+            return TipoBanho.objects.get(id=banho_id)
+        except (TipoBanho.DoesNotExist, ValueError):
+            return None
+    return None
 
 def login(request):
     if request.method == "POST":
@@ -182,7 +209,8 @@ def dashboard(request):
 #     return redirect("produtos")
 
 def listar_produtos(request):
-    produtos = Produto.objects.all()   # Busca direto no banco
+    # select_related evita consulta extra ao mostrar o nome do banho
+    produtos = Produto.objects.select_related("banho").all()
     return render(request, "estoque_app/produtos.html", {"produtos": produtos})
 
 def adicionar_produto(request):
@@ -193,11 +221,14 @@ def adicionar_produto(request):
             preco=request.POST.get("preco"),
             estoque=request.POST.get("quantidade"),
             tipo=request.POST.get("tipo"),
-            categoria=request.POST.get("categoria")
+            categoria=request.POST.get("categoria"),
+            peso=obter_peso_do_formulario(request),
+            banho=obter_banho_do_formulario(request),
         )
         return redirect("produtos")
 
-    return render(request, "estoque_app/adicionar.html")
+    tipos_banho = TipoBanho.objects.all().order_by("nome")
+    return render(request, "estoque_app/adicionar.html", {"tipos_banho": tipos_banho})
 
 def editar_produto(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
@@ -209,10 +240,17 @@ def editar_produto(request, produto_id):
         produto.estoque = request.POST.get("quantidade")
         produto.tipo = request.POST.get("tipo")
         produto.categoria = request.POST.get("categoria")
+        produto.peso = obter_peso_do_formulario(request)
+        produto.banho = obter_banho_do_formulario(request)
         produto.save()
         return redirect("produtos")
 
-    return render(request, "estoque_app/editar.html", {"produto": produto})
+    tipos_banho = TipoBanho.objects.all().order_by("nome")
+    return render(
+        request,
+        "estoque_app/editar.html",
+        {"produto": produto, "tipos_banho": tipos_banho},
+    )
 
 @require_POST
 def remover_produto(request, produto_id):

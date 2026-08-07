@@ -38,7 +38,17 @@ class Usuario(models.Model):
     tipo = models.CharField(max_length=10, choices=[('admin','Admin'),('cliente','Cliente')], default='cliente')
     criado_em = models.DateTimeField(auto_now_add=True)
     class Meta:
-        db_table = 'usuarios' 
+        db_table = 'usuarios'
+
+# Tipos de banho reutilizáveis (ex.: Ouro, Prata)
+class TipoBanho(models.Model):
+    nome = models.CharField(max_length=50, unique=True)
+
+    class Meta:
+        db_table = "tipos_banho"
+
+    def __str__(self):
+        return self.nome
 
 class Produto(models.Model):
     nome = models.CharField(max_length=100)
@@ -47,6 +57,14 @@ class Produto(models.Model):
     estoque = models.IntegerField()
     tipo = models.CharField(max_length=50, blank=True, null=True)
     categoria = models.CharField(max_length=50, blank=True, null=True)
+    # Peso em gramas (opcional para não quebrar produtos antigos)
+    peso = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
+    banho = models.ForeignKey(
+        TipoBanho,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:

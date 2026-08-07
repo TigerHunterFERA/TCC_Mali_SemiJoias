@@ -69,12 +69,17 @@
 
                 <label>Banho</label>
                 <select name="banho">
-                    <option {% if produto.banho == "Ouro" %}selected{% endif %}>Ouro</option>
-                    <option {% if produto.banho == "Prata" %}selected{% endif %}>Prata</option>
+                    <option value="">-- Selecione --</option>
+                    {% for tipo in tipos_banho %}
+                    <option value="{{ tipo.id }}" {% if produto.banho_id == tipo.id %}selected{% endif %}>{{ tipo.nome }}</option>
+                    {% endfor %}
                 </select><br>
 
+                <label>Novo tipo de banho</label>
+                <input type="text" name="novo_banho" placeholder="Ex: Ouro, Prata... (opcional)"><br>
+
                 <label>Peso (g)</label>
-                <input type="number" name="peso" value="{{ produto.peso|default:0 }}"><br>
+                <input type="number" name="peso" step="0.01" min="0" value="{{ produto.peso }}" placeholder="Ex: 2.50"><br>
 
                 <label>Preço (R$)</label>
                 <input type="number" step="0.01" name="preco" value="{{ produto.preco }}" required><br>

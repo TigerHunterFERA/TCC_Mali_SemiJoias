@@ -88,13 +88,19 @@
 
                 <label>Banho</label>
                 <select name="banho">
-                    <option>Ouro</option>
-                    <option>Prata</option>
+                    <option value="">-- Selecione --</option>
+                    {% for tipo in tipos_banho %}
+                    <option value="{{ tipo.id }}">{{ tipo.nome }}</option>
+                    {% endfor %}
                 </select>
                 <br>
 
+                <label>Novo tipo de banho</label>
+                <input type="text" name="novo_banho" placeholder="Ex: Ouro, Prata... (opcional)">
+                <br>
+
                 <label>Peso (g)</label>
-                <input type="number" name="peso" value="0">
+                <input type="number" name="peso" step="0.01" min="0" placeholder="Ex: 2.50">
                 <br>
 
                 <label>Preço (R$)</label>
