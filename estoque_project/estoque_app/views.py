@@ -83,10 +83,42 @@ from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
 import json
 
-def validar_produto(request):
+#def validar_produto(request):
+#    nome = (request.POST.get("nome") or "").strip()
+#    preco_texto = (request.POST.get("preco") or "").strip()
+#    estoque_texto = (request.POST.get("quantidade") or "").strip()
+#    peso_texto = (request.POST.get("peso") or "").strip()
+#
+#    if not nome:
+#        return "O nome do produto é obrigatório."
+#
+#    try:
+#        preco = Decimal(preco_texto)
+#   except (InvalidOperation, ValueError):
+#
+#    if preco < 0:
+#        return "O preço não pode ser negativo."
+#
+#    try:
+#        estoque = int(estoque_texto)
+#    except ValueError:
+#        return "Informe uma quantidade válida."
+#
+#        return "A quantidade em estoque não pode ser negativa."
+#
+#    if peso_texto:
+#        try:
+#        except (InvalidOperation, ValueError):
+#            return "Informe um peso válido."
+#
+#        if peso < 0:
+#            return "O peso não pode ser negativo."
+#
+#    return None
+
+def validar_produto(request, validar_estoque=True):
     nome = (request.POST.get("nome") or "").strip()
     preco_texto = (request.POST.get("preco") or "").strip()
-    estoque_texto = (request.POST.get("quantidade") or "").strip()
     peso_texto = (request.POST.get("peso") or "").strip()
 
     if not nome:
@@ -100,13 +132,16 @@ def validar_produto(request):
     if preco < 0:
         return "O preço não pode ser negativo."
 
-    try:
-        estoque = int(estoque_texto)
-    except ValueError:
-        return "Informe uma quantidade válida."
+    if validar_estoque:
+        estoque_texto = (request.POST.get("quantidade") or "").strip()
 
-    if estoque < 0:
-        return "A quantidade em estoque não pode ser negativa."
+        try:
+            estoque = int(estoque_texto)
+        except ValueError:
+            return "Informe uma quantidade válida."
+
+        if estoque < 0:
+            return "A quantidade em estoque não pode ser negativa."
 
     if peso_texto:
         try:
@@ -118,6 +153,7 @@ def validar_produto(request):
             return "O peso não pode ser negativo."
 
     return None
+
 
 def obter_peso_do_formulario(request):
     """Converte o peso do formulário. Campo vazio vira None."""
@@ -292,7 +328,7 @@ def editar_produto(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
 
     if request.method == "POST":
-        erro = validar_produto(request)
+        erro = validar_produto(request, validar_estoque=False)
 
         if erro:
             tipos_banho = TipoBanho.objects.all().order_by("nome")
@@ -309,7 +345,6 @@ def editar_produto(request, produto_id):
         produto.nome = (request.POST.get("nome") or "").strip()
         produto.descricao = request.POST.get("descricao")
         produto.preco = request.POST.get("preco")
-        produto.estoque = request.POST.get("quantidade")
         produto.tipo = request.POST.get("tipo")
         produto.categoria = request.POST.get("categoria")
         produto.peso = obter_peso_do_formulario(request)
@@ -327,6 +362,19 @@ def editar_produto(request, produto_id):
 @require_POST
 def remover_produto(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
+
+    if produto.movimentacoes.exists():
+        produtos = Produto.objects.select_related("banho").all()
+
+        return render(
+            request,
+            "estoque_app/produtos.html",
+            {
+                "produtos": produtos,
+                "erro": "Não é possível excluir este produto porque ele possui movimentações de estoque.",
+            },
+        )
+
     produto.delete()
     return redirect("produtos")
 

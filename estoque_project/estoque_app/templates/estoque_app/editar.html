@@ -90,8 +90,22 @@
                 <label>Preço (R$)</label>
                 <input type="number" step="0.01" min="0" name="preco" value="{{ produto.preco }}" required><br>
 
-                <label>Estoque</label>
-                <input type="number" min="0" name="quantidade" value="{{ produto.estoque }}" required><br>
+                <label>Estoque atual</label>
+                <input
+                    type="number"
+                    value="{{ produto.estoque }}"
+                    readonly
+                >
+
+                <p style="font-size: 13px; color: #666;">
+                    Para alterar o estoque, utilize a opção "Movimentar estoque".
+                </p>
+
+                <a href="{% url 'movimentar' produto.id %}" class="btn-mali" style="text-decoration:none;">
+                    📦 Movimentar estoque
+                </a>
+
+                <br>
 
                 <label>URL da Imagem</label>
                 <input type="url" name="imagem" value="{{ produto.imagem }}" placeholder="https://..."><br>

@@ -62,6 +62,11 @@
         <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
             <div>
                 <h1>Gerenciar Produtos</h1>
+                {% if erro %}
+                    <p style="color: red; font-weight: bold;">
+                        {{ erro }}
+                    </p>
+                {% endif %}
                 <p style="margin-top:6px; color:#6f6f6f;">Controle de inventário</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
