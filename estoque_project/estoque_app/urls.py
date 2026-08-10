@@ -15,4 +15,10 @@ urlpatterns = [
         name="movimentar",
     ),
     path("movimentacoes/", views.listar_movimentacoes, name="movimentacoes"),
+    path("pedidos/", views.listar_pedidos, name="pedidos"),
+    path(
+        "pedidos/<int:pedido_id>/",
+        views.detalhe_pedido,
+        name="detalhe_pedido",
+    ),
 ]

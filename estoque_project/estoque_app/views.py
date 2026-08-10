@@ -78,7 +78,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-from .models import Produto, TipoBanho, MovimentacaoEstoque
+from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido
 from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
 import json
@@ -445,4 +445,52 @@ def listar_movimentacoes(request):
         request,
         "estoque_app/movimentacoes.html",
         {"movimentacoes": movimentacoes},
+    )
+
+
+def listar_pedidos(request):
+    """Lista os pedidos existentes (somente leitura)."""
+    pedidos = (
+        Pedido.objects.select_related("usuario")
+        .order_by("-data_pedido")
+    )
+    return render(request, "estoque_app/pedidos.html", {"pedidos": pedidos})
+
+
+def detalhe_pedido(request, pedido_id):
+    """Mostra os dados de um pedido e seus itens (somente leitura)."""
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("usuario"),
+        id=pedido_id,
+    )
+
+    itens_banco = (
+        ItemPedido.objects.filter(pedido=pedido)
+        .select_related("produto")
+    )
+
+    # Calcula subtotal por item e total do pedido de forma simples
+    itens = []
+    total = Decimal("0")
+
+    for item in itens_banco:
+        subtotal = item.quantidade * item.preco_unitario
+        total = total + subtotal
+        itens.append(
+            {
+                "produto": item.produto,
+                "quantidade": item.quantidade,
+                "preco_unitario": item.preco_unitario,
+                "subtotal": subtotal,
+            }
+        )
+
+    return render(
+        request,
+        "estoque_app/detalhe_pedido.html",
+        {
+            "pedido": pedido,
+            "itens": itens,
+            "total": total,
+        },
     )
