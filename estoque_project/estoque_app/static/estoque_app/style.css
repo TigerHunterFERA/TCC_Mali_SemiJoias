@@ -545,3 +545,36 @@ td {
 .login-box button:hover {
     filter: brightness(0.96);
 }
+
+.banho-wrapper {
+    display: inline-block;
+    width: 100%;
+    max-width: 420px;
+}
+
+.banho-wrapper select {
+    width: 100%;
+}
+
+.novo-banho-container {
+    display: none;
+    align-items: center;
+    gap: 15px;
+
+    padding: 12px 14px;
+
+    border: 1px solid #ddd;
+    border-top: none;
+
+    background: white;
+}
+
+.novo-banho-container span {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.novo-banho-container input {
+    flex: 1;
+    min-width: 120px;
+}

@@ -74,15 +74,35 @@
                 <input type="text" name="categoria" value="{{ produto.categoria }}"><br>
 
                 <label>Banho</label>
-                <select name="banho">
-                    <option value="">-- Selecione --</option>
-                    {% for tipo in tipos_banho %}
-                    <option value="{{ tipo.id }}" {% if produto.banho_id == tipo.id %}selected{% endif %}>{{ tipo.nome }}</option>
-                    {% endfor %}
-                </select><br>
 
-                <label>Novo tipo de banho</label>
-                <input type="text" name="novo_banho" placeholder="Ex: Ouro, Prata... (opcional)"><br>
+                <div class="banho-wrapper">
+                    <select name="banho" id="banho-select">
+                        <option value="">-- Selecione --</option>
+                
+                        {% for tipo in tipos_banho %}
+                            <option
+                                value="{{ tipo.id }}"
+                                {% if produto.banho_id == tipo.id %}selected{% endif %}
+                            >
+                                {{ tipo.nome }}
+                            </option>
+                        {% endfor %}
+                
+                        <option value="__novo__">＋ Novo tipo de banho</option>
+                    </select>
+                
+                    <div id="novo-banho-container" class="novo-banho-container">
+                        <span>Digite um novo banho</span>
+                
+                        <input
+                            type="text"
+                            name="novo_banho"
+                            id="novo-banho-input"
+                            placeholder="Ex: Ródio Branco"
+                        >
+                    </div>
+                </div>
+                <br>
 
                 <label>Peso (g)</label>
                 <input type="number" name="peso" step="0.01" min="0" value="{{ produto.peso }}" placeholder="Ex: 2.50"><br>
@@ -119,5 +139,22 @@
             {% endif %}
         </div>
     </main>
+    <script>
+        const banhoSelect = document.getElementById("banho-select");
+        const novoBanhoContainer = document.getElementById("novo-banho-container");
+        const novoBanhoInput = document.getElementById("novo-banho-input");
+    
+        banhoSelect.addEventListener("change", function () {
+            if (this.value === "__novo__") {
+                novoBanhoContainer.style.display = "block";
+                novoBanhoInput.required = true;
+                novoBanhoInput.focus();
+            } else {
+                novoBanhoContainer.style.display = "none";
+                novoBanhoInput.required = false;
+                novoBanhoInput.value = "";
+            }
+        });
+    </script>
 </body>
 </html>
