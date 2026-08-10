@@ -88,17 +88,23 @@
 <body>
     <nav class="sidebar">
         <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
         <a href="{% url 'dashboard' %}">📊 Dashboard</a>
         <a href="{% url 'produtos' %}">💍 Estoque</a>
         <a href="#">⚙️ Configurações</a>
     </nav>
 
     <main class="main-content">
-        <header class="page-header">
-            <h1>Bem-vindo à Mali Semijoias</h1>
-            {% if erro_db %}
-                <p class="erro">Erro ao conectar no banco: {{ erro_db }}</p>
-            {% endif %}
+        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+            <div>
+                <h1>Bem-vindo à Mali Semijoias</h1>
+                {% if erro_db %}
+                    <p class="erro">Erro ao conectar no banco: {{ erro_db }}</p>
+                {% endif %}
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <a href="{% url 'pagina_inicial' %}" class="btn-mali">Voltar</a>
+            </div>
         </header>
 
         <section class="dashboard-grid">

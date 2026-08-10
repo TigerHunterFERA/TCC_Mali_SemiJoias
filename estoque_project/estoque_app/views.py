@@ -78,7 +78,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido
+from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido, Usuario
 from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
 import json
@@ -197,13 +197,19 @@ def login(request):
 
         # Aqui você pode validar usuário/senha futuramente
         if usuario and senha:
-            # Se login for válido, redireciona para o dashboard
-            return redirect("dashboard")
+            # Login válido: vai para a Página Inicial (não para o dashboard)
+            return redirect("pagina_inicial")
         else:
             return render(request, "estoque_app/login.html", {"mensagem": "Usuário ou senha inválidos."})
 
     # Se for GET, apenas renderiza a tela de login
     return render(request, "estoque_app/login.html")
+
+
+def pagina_inicial(request):
+    """Tela de entrada após o login, com atalhos para os módulos."""
+    return render(request, "estoque_app/pagina_inicial.html")
+
 
 def dashboard(request):
     try:
@@ -449,7 +455,7 @@ def listar_movimentacoes(request):
 
 
 def listar_pedidos(request):
-    """Lista os pedidos existentes (somente leitura)."""
+    """Lista os pedidos existentes."""
     pedidos = (
         Pedido.objects.select_related("usuario")
         .order_by("-data_pedido")
@@ -457,8 +463,37 @@ def listar_pedidos(request):
     return render(request, "estoque_app/pedidos.html", {"pedidos": pedidos})
 
 
+def criar_pedido(request):
+    """Cria um pedido escolhendo apenas o cliente (status padrão do model)."""
+    clientes = Usuario.objects.filter(tipo="cliente").order_by("nome")
+
+    if request.method == "POST":
+        usuario_id = request.POST.get("usuario")
+
+        try:
+            cliente = Usuario.objects.get(id=usuario_id, tipo="cliente")
+        except (Usuario.DoesNotExist, ValueError, TypeError):
+            return render(
+                request,
+                "estoque_app/novo_pedido.html",
+                {
+                    "clientes": clientes,
+                    "erro": "Selecione um cliente válido.",
+                },
+            )
+
+        pedido = Pedido.objects.create(usuario=cliente)
+        return redirect("detalhe_pedido", pedido_id=pedido.id)
+
+    return render(
+        request,
+        "estoque_app/novo_pedido.html",
+        {"clientes": clientes},
+    )
+
+
 def detalhe_pedido(request, pedido_id):
-    """Mostra os dados de um pedido e seus itens (somente leitura)."""
+    """Mostra os dados de um pedido e seus itens."""
     pedido = get_object_or_404(
         Pedido.objects.select_related("usuario"),
         id=pedido_id,
@@ -492,5 +527,85 @@ def detalhe_pedido(request, pedido_id):
             "pedido": pedido,
             "itens": itens,
             "total": total,
+        },
+    )
+
+
+def adicionar_item_pedido(request, pedido_id):
+    """Adiciona um item ao pedido (um por vez). Não altera o estoque do produto."""
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("usuario"),
+        id=pedido_id,
+    )
+    produtos = Produto.objects.all().order_by("nome")
+
+    if request.method == "POST":
+        produto_id = request.POST.get("produto")
+        quantidade_texto = (request.POST.get("quantidade") or "").strip()
+
+        try:
+            produto = Produto.objects.get(id=produto_id)
+        except (Produto.DoesNotExist, ValueError, TypeError):
+            return render(
+                request,
+                "estoque_app/adicionar_item_pedido.html",
+                {
+                    "pedido": pedido,
+                    "produtos": produtos,
+                    "erro": "Selecione um produto válido.",
+                },
+            )
+
+        try:
+            quantidade = int(quantidade_texto)
+        except ValueError:
+            return render(
+                request,
+                "estoque_app/adicionar_item_pedido.html",
+                {
+                    "pedido": pedido,
+                    "produtos": produtos,
+                    "erro": "Informe uma quantidade válida.",
+                },
+            )
+
+        if quantidade <= 0:
+            return render(
+                request,
+                "estoque_app/adicionar_item_pedido.html",
+                {
+                    "pedido": pedido,
+                    "produtos": produtos,
+                    "erro": "A quantidade deve ser maior que zero.",
+                },
+            )
+
+        if quantidade > produto.estoque:
+            return render(
+                request,
+                "estoque_app/adicionar_item_pedido.html",
+                {
+                    "pedido": pedido,
+                    "produtos": produtos,
+                    "erro": "Quantidade maior que o estoque disponível.",
+                },
+            )
+
+        # Congela o preço do produto no momento do pedido
+        ItemPedido.objects.create(
+            pedido=pedido,
+            produto=produto,
+            quantidade=quantidade,
+            preco_unitario=produto.preco,
+        )
+
+        return redirect("detalhe_pedido", pedido_id=pedido.id)
+
+    return render(
+        request,
+        "estoque_app/adicionar_item_pedido.html",
+        {
+            "pedido": pedido,
+            "produtos": produtos,
         },
     )

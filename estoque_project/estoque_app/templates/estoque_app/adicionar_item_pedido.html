@@ -1,0 +1,60 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Adicionar Item</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="{% url 'pedidos' %}">🧾 Pedidos</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+            <div>
+                <h1>Adicionar item ao pedido</h1>
+                <p style="margin-top:6px; color:#6f6f6f;">
+                    Pedido #{{ pedido.id }} — Cliente: {{ pedido.usuario.nome }}
+                </p>
+            </div>
+            <a href="{% url 'pagina_inicial' %}" class="btn-mali" style="background:#ccc; color:#333;">Página Inicial</a>
+        </header>
+
+        <div class="card">
+            {% if erro %}
+                <p style="color: red; font-weight: bold;">{{ erro }}</p>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+
+                <label for="produto">Produto</label>
+                <select name="produto" id="produto" required>
+                    <option value="">Selecione um produto</option>
+                    {% for produto in produtos %}
+                        <option value="{{ produto.id }}">
+                            {{ produto.nome }} — estoque: {{ produto.estoque }}
+                        </option>
+                    {% empty %}
+                        <option value="" disabled>Nenhum produto cadastrado</option>
+                    {% endfor %}
+                </select>
+
+                <label for="quantidade" style="margin-top: 12px; display:block;">Quantidade</label>
+                <input type="number" name="quantidade" id="quantidade" min="1" step="1" required>
+
+                <div style="margin-top: 16px; display:flex; gap:10px;">
+                    <button type="submit" class="btn-mali">Adicionar</button>
+                    <a href="{% url 'detalhe_pedido' pedido.id %}" class="btn-mali" style="background:#ccc; color:#333;">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

@@ -1,0 +1,53 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Novo Pedido</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="{% url 'pedidos' %}">🧾 Pedidos</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+            <div>
+                <h1>Novo Pedido</h1>
+                <p style="margin-top:6px; color:#6f6f6f;">Selecione o cliente para criar o pedido</p>
+            </div>
+            <a href="{% url 'pagina_inicial' %}" class="btn-mali" style="background:#ccc; color:#333;">Página Inicial</a>
+        </header>
+
+        <div class="card">
+            {% if erro %}
+                <p style="color: red; font-weight: bold;">{{ erro }}</p>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+
+                <label for="usuario">Cliente</label>
+                <select name="usuario" id="usuario" required>
+                    <option value="">Selecione um cliente</option>
+                    {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}">{{ cliente.nome }} ({{ cliente.email }})</option>
+                    {% empty %}
+                        <option value="" disabled>Nenhum cliente cadastrado</option>
+                    {% endfor %}
+                </select>
+
+                <div style="margin-top: 16px; display:flex; gap:10px;">
+                    <button type="submit" class="btn-mali">Criar Pedido</button>
+                    <a href="{% url 'pedidos' %}" class="btn-mali" style="background:#ccc; color:#333;">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

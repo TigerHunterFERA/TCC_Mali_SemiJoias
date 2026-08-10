@@ -53,6 +53,7 @@
 
     <nav class="sidebar">
         <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
         <a href="{% url 'dashboard' %}">📊 Dashboard</a>
         <a href="{% url 'produtos' %}">💍 Estoque</a>
         <a href="#">⚙️ Configurações</a>
@@ -70,6 +71,7 @@
                 <p style="margin-top:6px; color:#6f6f6f;">Controle de inventário</p>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
+                <a href="{% url 'pagina_inicial' %}" class="btn-mali">Voltar</a>
                 <a href="{% url 'movimentacoes' %}" class="btn-mali" style="background:#ccc; color:#333;">Histórico</a>
                 <a href="{% url 'adicionar' %}" class="btn-mali">+ Novo Produto</a>
             </div>

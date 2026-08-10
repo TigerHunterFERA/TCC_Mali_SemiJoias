@@ -1,0 +1,59 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Página Inicial</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="{% url 'pedidos' %}">🧾 Pedidos</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header">
+            <h1>Página Inicial</h1>
+            <p style="margin-top:6px; color:#6f6f6f;">Escolha um módulo para continuar</p>
+        </header>
+
+        <section class="quick-actions">
+            <a href="{% url 'produtos' %}" class="action-card">
+                <div class="action-icon">💍</div>
+                <div>
+                    <div class="action-title">Produtos</div>
+                    <div class="action-subtitle">Gerenciar catálogo e estoque</div>
+                </div>
+            </a>
+
+            <a href="{% url 'pedidos' %}" class="action-card">
+                <div class="action-icon">🧾</div>
+                <div>
+                    <div class="action-title">Pedidos</div>
+                    <div class="action-subtitle">Criar e consultar pedidos</div>
+                </div>
+            </a>
+
+            <a href="{% url 'dashboard' %}" class="action-card">
+                <div class="action-icon">📊</div>
+                <div>
+                    <div class="action-title">Dashboard</div>
+                    <div class="action-subtitle">Resumo do sistema</div>
+                </div>
+            </a>
+
+            <a href="#" class="action-card">
+                <div class="action-icon">💬</div>
+                <div>
+                    <div class="action-title">Chatbot</div>
+                    <div class="action-subtitle">Em breve</div>
+                </div>
+            </a>
+        </section>
+    </main>
+</body>
+</html>

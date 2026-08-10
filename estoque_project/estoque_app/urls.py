@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path("", views.login, name="login"), 
     path("login/", views.login, name="login"),
+    path("inicio/", views.pagina_inicial, name="pagina_inicial"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("produtos/", views.listar_produtos, name="produtos"), 
     path("adicionar/", views.adicionar_produto, name="adicionar"),
@@ -16,6 +17,13 @@ urlpatterns = [
     ),
     path("movimentacoes/", views.listar_movimentacoes, name="movimentacoes"),
     path("pedidos/", views.listar_pedidos, name="pedidos"),
+    # pedidos/novo/ deve ficar ANTES de pedidos/<int:pedido_id>/
+    path("pedidos/novo/", views.criar_pedido, name="novo_pedido"),
+    path(
+        "pedidos/<int:pedido_id>/adicionar-item/",
+        views.adicionar_item_pedido,
+        name="adicionar_item_pedido",
+    ),
     path(
         "pedidos/<int:pedido_id>/",
         views.detalhe_pedido,

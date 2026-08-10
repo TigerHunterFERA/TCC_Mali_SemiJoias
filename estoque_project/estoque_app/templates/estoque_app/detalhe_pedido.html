@@ -9,6 +9,7 @@
 <body>
     <nav class="sidebar">
         <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
         <a href="{% url 'dashboard' %}">📊 Dashboard</a>
         <a href="{% url 'produtos' %}">💍 Estoque</a>
         <a href="{% url 'movimentacoes' %}">📦 Movimentações</a>
@@ -21,7 +22,11 @@
                 <h1>Pedido #{{ pedido.id }}</h1>
                 <p style="margin-top:6px; color:#6f6f6f;">Detalhes do pedido</p>
             </div>
-            <a href="{% url 'pedidos' %}" class="btn-mali">Voltar aos pedidos</a>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <a href="{% url 'pagina_inicial' %}" class="btn-mali" style="background:#ccc; color:#333;">Página Inicial</a>
+                <a href="{% url 'adicionar_item_pedido' pedido.id %}" class="btn-mali">+ Adicionar item</a>
+                <a href="{% url 'pedidos' %}" class="btn-mali">Voltar aos pedidos</a>
+            </div>
         </header>
 
         <div class="table-container" style="margin-bottom: 20px;">
