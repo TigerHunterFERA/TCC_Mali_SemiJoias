@@ -21,6 +21,7 @@
                 <h1>Adicionar item ao pedido</h1>
                 <p style="margin-top:6px; color:#6f6f6f;">
                     Pedido #{{ pedido.id }} — Cliente: {{ pedido.usuario.nome }}
+                    (somente pedidos pendentes)
                 </p>
             </div>
             <a href="{% url 'pagina_inicial' %}" class="btn-mali" style="background:#ccc; color:#333;">Página Inicial</a>

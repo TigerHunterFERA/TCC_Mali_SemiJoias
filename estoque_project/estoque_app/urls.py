@@ -24,6 +24,17 @@ urlpatterns = [
         views.adicionar_item_pedido,
         name="adicionar_item_pedido",
     ),
+    # finalizar/ deve ficar ANTES de pedidos/<int:pedido_id>/
+    path(
+        "pedidos/<int:pedido_id>/finalizar/",
+        views.finalizar_pedido,
+        name="finalizar_pedido",
+    ),
+    path(
+        "pedidos/<int:pedido_id>/confirmar-pagamento/",
+        views.confirmar_pagamento,
+        name="confirmar_pagamento",
+    ),
     path(
         "pedidos/<int:pedido_id>/",
         views.detalhe_pedido,

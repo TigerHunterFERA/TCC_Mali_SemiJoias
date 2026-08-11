@@ -78,6 +78,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
+from django.db import transaction
 from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido, Usuario
 from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
@@ -492,13 +493,8 @@ def criar_pedido(request):
     )
 
 
-def detalhe_pedido(request, pedido_id):
-    """Mostra os dados de um pedido e seus itens."""
-    pedido = get_object_or_404(
-        Pedido.objects.select_related("usuario"),
-        id=pedido_id,
-    )
-
+def montar_contexto_detalhe_pedido(pedido, erro=None):
+    """Monta o contexto da tela de detalhe (itens, subtotais e total)."""
     itens_banco = (
         ItemPedido.objects.filter(pedido=pedido)
         .select_related("produto")
@@ -520,15 +516,153 @@ def detalhe_pedido(request, pedido_id):
             }
         )
 
+    contexto = {
+        "pedido": pedido,
+        "itens": itens,
+        "total": total,
+    }
+
+    if erro:
+        contexto["erro"] = erro
+
+    return contexto
+
+
+def detalhe_pedido(request, pedido_id):
+    """Mostra os dados de um pedido e seus itens."""
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("usuario"),
+        id=pedido_id,
+    )
+
     return render(
         request,
         "estoque_app/detalhe_pedido.html",
-        {
-            "pedido": pedido,
-            "itens": itens,
-            "total": total,
-        },
+        montar_contexto_detalhe_pedido(pedido),
     )
+
+
+@require_POST
+def finalizar_pedido(request, pedido_id):
+    """
+    Finaliza o pedido: pendente -> aguardando_pagamento.
+    Não altera estoque nem cria movimentação.
+    """
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("usuario"),
+        id=pedido_id,
+    )
+
+    if pedido.status != "pendente":
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(
+                pedido,
+                "Este pedido não pode mais ser finalizado.",
+            ),
+        )
+
+    possui_itens = ItemPedido.objects.filter(pedido=pedido).exists()
+    if not possui_itens:
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(
+                pedido,
+                "Não é possível finalizar um pedido sem itens.",
+            ),
+        )
+
+    pedido.status = "aguardando_pagamento"
+    pedido.save()
+
+    return redirect("detalhe_pedido", pedido_id=pedido.id)
+
+
+@require_POST
+def confirmar_pagamento(request, pedido_id):
+    """
+    Confirma o pagamento: aguardando_pagamento -> pago.
+    Valida estoque de todos os itens, baixa o estoque e registra saídas.
+    Tudo ou nada (transaction.atomic).
+    """
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("usuario"),
+        id=pedido_id,
+    )
+
+    if pedido.status != "aguardando_pagamento":
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(
+                pedido,
+                "Este pedido não está aguardando pagamento.",
+            ),
+        )
+
+    itens = list(
+        ItemPedido.objects.filter(pedido=pedido).select_related("produto")
+    )
+
+    if not itens:
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(
+                pedido,
+                "Não é possível confirmar pagamento de um pedido sem itens.",
+            ),
+        )
+
+    # Agrupa a quantidade total necessária por produto
+    # (mesmo produto em vários itens do pedido → uma única baixa)
+    necessidade_por_produto = {}
+    for item in itens:
+        produto = item.produto
+        if produto.id not in necessidade_por_produto:
+            necessidade_por_produto[produto.id] = {
+                "produto": produto,
+                "quantidade": 0,
+            }
+        necessidade_por_produto[produto.id]["quantidade"] += item.quantidade
+
+    # Etapa 1: validar estoque de TODOS os produtos (sem alterar nada)
+    for dados in necessidade_por_produto.values():
+        produto = dados["produto"]
+        quantidade_total = dados["quantidade"]
+
+        if quantidade_total > produto.estoque:
+            return render(
+                request,
+                "estoque_app/detalhe_pedido.html",
+                montar_contexto_detalhe_pedido(
+                    pedido,
+                    f"Estoque insuficiente para o produto {produto.nome}.",
+                ),
+            )
+
+    # Etapa 2: aplicar alterações somente se a validação passou
+    with transaction.atomic():
+        # Baixa o estoque UMA vez por produto, usando a soma total
+        for dados in necessidade_por_produto.values():
+            produto = dados["produto"]
+            produto.estoque = produto.estoque - dados["quantidade"]
+            produto.save()
+
+        # Mantém uma movimentação de saída por ItemPedido
+        for item in itens:
+            MovimentacaoEstoque.objects.create(
+                produto=item.produto,
+                tipo=MovimentacaoEstoque.TIPO_SAIDA,
+                quantidade=item.quantidade,
+            )
+
+        pedido.status = "pago"
+        pedido.save()
+
+    return redirect("detalhe_pedido", pedido_id=pedido.id)
 
 
 def adicionar_item_pedido(request, pedido_id):
@@ -537,6 +671,18 @@ def adicionar_item_pedido(request, pedido_id):
         Pedido.objects.select_related("usuario"),
         id=pedido_id,
     )
+
+    # Só pedidos pendentes podem receber itens (proteção no servidor)
+    if pedido.status != "pendente":
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(
+                pedido,
+                "Só é possível adicionar itens a pedidos com status pendente.",
+            ),
+        )
+
     produtos = Produto.objects.all().order_by("nome")
 
     if request.method == "POST":

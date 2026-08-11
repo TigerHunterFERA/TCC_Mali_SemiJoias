@@ -24,10 +24,34 @@
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
                 <a href="{% url 'pagina_inicial' %}" class="btn-mali" style="background:#ccc; color:#333;">Página Inicial</a>
-                <a href="{% url 'adicionar_item_pedido' pedido.id %}" class="btn-mali">+ Adicionar item</a>
+                {% if pedido.status == "pendente" %}
+                    <a href="{% url 'adicionar_item_pedido' pedido.id %}" class="btn-mali">+ Adicionar item</a>
+                    <form method="POST" action="{% url 'finalizar_pedido' pedido.id %}" style="display:inline; margin:0;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-mali">Finalizar pedido</button>
+                    </form>
+                {% endif %}
+                {% if pedido.status == "aguardando_pagamento" %}
+                    <form method="POST" action="{% url 'confirmar_pagamento' pedido.id %}" style="display:inline; margin:0;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-mali">Confirmar pagamento</button>
+                    </form>
+                {% endif %}
                 <a href="{% url 'pedidos' %}" class="btn-mali">Voltar aos pedidos</a>
             </div>
         </header>
+
+        {% if erro %}
+            <p style="color: red; font-weight: bold; margin-bottom: 16px;">{{ erro }}</p>
+        {% endif %}
+
+        {% if pedido.status == "aguardando_pagamento" %}
+            <p style="font-weight: bold; margin-bottom: 16px;">Aguardando pagamento</p>
+        {% endif %}
+
+        {% if pedido.status == "pago" %}
+            <p style="font-weight: bold; margin-bottom: 16px; color: green;">Status: Pago</p>
+        {% endif %}
 
         <div class="table-container" style="margin-bottom: 20px;">
             <table>

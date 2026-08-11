@@ -103,7 +103,16 @@ class MovimentacaoEstoque(models.Model):
 class Pedido(models.Model):
     usuario = models.ForeignKey(Usuario, on_delete=models.PROTECT)#on_delete=models.PROTECT
     data_pedido = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=10, choices=[('pendente','Pendente'),('pago','Pago'),('cancelado','Cancelado')], default='pendente')
+    status = models.CharField(
+        max_length=25,
+        choices=[
+            ('pendente', 'Pendente'),
+            ('aguardando_pagamento', 'Aguardando pagamento'),
+            ('pago', 'Pago'),
+            ('cancelado', 'Cancelado'),
+        ],
+        default='pendente',
+    )
 
     class Meta:
         db_table = 'pedidos'
