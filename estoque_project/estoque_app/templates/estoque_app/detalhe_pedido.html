@@ -37,6 +37,12 @@
                         <button type="submit" class="btn-mali">Confirmar pagamento</button>
                     </form>
                 {% endif %}
+                {% if pedido.status == "pendente" or pedido.status == "aguardando_pagamento" %}
+                    <form method="POST" action="{% url 'cancelar_pedido' pedido.id %}" style="display:inline; margin:0;" onsubmit="return confirm('Deseja cancelar este pedido?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-mali" style="background:#ff5e9e;">Cancelar pedido</button>
+                    </form>
+                {% endif %}
                 <a href="{% url 'pedidos' %}" class="btn-mali">Voltar aos pedidos</a>
             </div>
         </header>
@@ -51,6 +57,10 @@
 
         {% if pedido.status == "pago" %}
             <p style="font-weight: bold; margin-bottom: 16px; color: green;">Status: Pago</p>
+        {% endif %}
+
+        {% if pedido.status == "cancelado" %}
+            <p style="font-weight: bold; margin-bottom: 16px; color: #c0392b;">Status: Cancelado</p>
         {% endif %}
 
         <div class="table-container" style="margin-bottom: 20px;">

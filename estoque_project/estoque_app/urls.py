@@ -36,6 +36,11 @@ urlpatterns = [
         name="confirmar_pagamento",
     ),
     path(
+        "pedidos/<int:pedido_id>/cancelar/",
+        views.cancelar_pedido,
+        name="cancelar_pedido",
+    ),
+    path(
         "pedidos/<int:pedido_id>/",
         views.detalhe_pedido,
         name="detalhe_pedido",

@@ -665,6 +665,53 @@ def confirmar_pagamento(request, pedido_id):
     return redirect("detalhe_pedido", pedido_id=pedido.id)
 
 
+@require_POST
+def cancelar_pedido(request, pedido_id):
+    """
+    Cancela pedido pendente ou aguardando pagamento.
+    Não altera estoque nem cria movimentação (baixa só ocorre no pagamento).
+    """
+    pedido = get_object_or_404(
+        Pedido.objects.select_related("usuario"),
+        id=pedido_id,
+    )
+
+    if pedido.status == "pago":
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(
+                pedido,
+                "Pedido pago não pode ser cancelado por esta operação.",
+            ),
+        )
+
+    if pedido.status == "cancelado":
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(
+                pedido,
+                "Este pedido já está cancelado.",
+            ),
+        )
+
+    if pedido.status not in ("pendente", "aguardando_pagamento"):
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(
+                pedido,
+                "Este pedido não pode ser cancelado.",
+            ),
+        )
+
+    pedido.status = "cancelado"
+    pedido.save()
+
+    return redirect("detalhe_pedido", pedido_id=pedido.id)
+
+
 def adicionar_item_pedido(request, pedido_id):
     """Adiciona um item ao pedido (um por vez). Não altera o estoque do produto."""
     pedido = get_object_or_404(
