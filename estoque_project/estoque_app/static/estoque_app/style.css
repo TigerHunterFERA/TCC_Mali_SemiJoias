@@ -578,3 +578,68 @@ td {
     flex: 1;
     min-width: 120px;
 }
+
+/* Tela Editar Produto — organização visual dos blocos */
+.editar-produto-form .form-group {
+    margin-bottom: 16px;
+}
+
+.estoque-edicao {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 8px 0 0;
+    padding: 16px 0 8px;
+    border-top: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+}
+
+.estoque-edicao .form-group {
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.estoque-edicao input[readonly] {
+    background-color: #f0f0f0;
+    color: #555;
+    cursor: default;
+}
+
+.estoque-edicao-ajuda {
+    font-size: 13px;
+    color: #666;
+    margin: 0;
+}
+
+.estoque-edicao-movimentar {
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+.estoque-edicao-descricao {
+    margin-top: 28px;
+}
+
+.estoque-edicao-descricao textarea {
+    min-height: 120px;
+    width: 100%;
+    resize: vertical;
+}
+
+.estoque-edicao-botoes {
+    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    grid-column: auto;
+}
+
+.estoque-edicao-cancelar {
+    background: #ccc;
+    color: #333;
+}
+
+.estoque-edicao-cancelar:hover {
+    background: #bbb;
+}

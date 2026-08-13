@@ -61,77 +61,96 @@
 
         <!-- Card estilizado -->
         <div class="card">
-            <form method="POST" class="form-container">
+            <form method="POST" class="form-container editar-produto-form">
                 {% csrf_token %}
 
-                <label>Nome do Produto</label>
-                <input type="text" name="nome" value="{{ produto.nome }}" required><br>
+                <div class="form-group">
+                    <label>Nome do Produto</label>
+                    <input type="text" name="nome" value="{{ produto.nome }}" required>
+                </div>
 
-                <label>Tipo do Produto</label>
-                <input type="text" name="tipo" value="{{ produto.tipo }}" placeholder="Ex: anel, colar..."><br>
+                <div class="form-group">
+                    <label>Tipo do Produto</label>
+                    <input type="text" name="tipo" value="{{ produto.tipo }}" placeholder="Ex: anel, colar...">
+                </div>
 
-                <label>Categoria</label>
-                <input type="text" name="categoria" value="{{ produto.categoria }}"><br>
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <input type="text" name="categoria" value="{{ produto.categoria }}">
+                </div>
 
-                <label>Banho</label>
+                <div class="form-group">
+                    <label>Banho</label>
+                    <div class="banho-wrapper">
+                        <select name="banho" id="banho-select">
+                            <option value="">-- Selecione --</option>
 
-                <div class="banho-wrapper">
-                    <select name="banho" id="banho-select">
-                        <option value="">-- Selecione --</option>
-                
-                        {% for tipo in tipos_banho %}
-                            <option
-                                value="{{ tipo.id }}"
-                                {% if produto.banho_id == tipo.id %}selected{% endif %}
+                            {% for tipo in tipos_banho %}
+                                <option
+                                    value="{{ tipo.id }}"
+                                    {% if produto.banho_id == tipo.id %}selected{% endif %}
+                                >
+                                    {{ tipo.nome }}
+                                </option>
+                            {% endfor %}
+
+                            <option value="__novo__">＋ Novo tipo de banho</option>
+                        </select>
+
+                        <div id="novo-banho-container" class="novo-banho-container">
+                            <span>Digite um novo banho</span>
+
+                            <input
+                                type="text"
+                                name="novo_banho"
+                                id="novo-banho-input"
+                                placeholder="Ex: Ródio Branco"
                             >
-                                {{ tipo.nome }}
-                            </option>
-                        {% endfor %}
-                
-                        <option value="__novo__">＋ Novo tipo de banho</option>
-                    </select>
-                
-                    <div id="novo-banho-container" class="novo-banho-container">
-                        <span>Digite um novo banho</span>
-                
-                        <input
-                            type="text"
-                            name="novo_banho"
-                            id="novo-banho-input"
-                            placeholder="Ex: Ródio Branco"
-                        >
+                        </div>
                     </div>
                 </div>
-                <br>
 
-                <label>Peso (g)</label>
-                <input type="number" name="peso" step="0.01" min="0" value="{{ produto.peso }}" placeholder="Ex: 2.50"><br>
+                <div class="form-group">
+                    <label>Peso (g)</label>
+                    <input type="number" name="peso" step="0.01" min="0" value="{{ produto.peso }}" placeholder="Ex: 2.50">
+                </div>
 
-                <label>Preço (R$)</label>
-                <input type="number" step="0.01" min="0" name="preco" value="{{ produto.preco }}" required><br>
+                <div class="form-group">
+                    <label>Preço (R$)</label>
+                    <input type="number" step="0.01" min="0" name="preco" value="{{ produto.preco }}" required>
+                </div>
 
-                <label>Estoque atual</label>
-                <input
-                    type="number"
-                    value="{{ produto.estoque }}"
-                    readonly
-                >
+                <!-- Bloco 1: estoque somente leitura + movimentação -->
+                <div class="estoque-edicao">
+                    <div class="form-group">
+                        <label>Estoque atual</label>
+                        <input
+                            type="number"
+                            value="{{ produto.estoque }}"
+                            readonly
+                        >
+                    </div>
 
-                <p style="font-size: 13px; color: #666;">
-                    Para alterar o estoque, utilize a opção "Movimentar estoque".
-                </p>
+                    <p class="estoque-edicao-ajuda">
+                        Para alterar o estoque, utilize a opção "Movimentar estoque".
+                    </p>
 
-                <a href="{% url 'movimentar' produto.id %}" class="btn-mali" style="text-decoration:none;">
-                    📦 Movimentar estoque
-                </a>
+                    <a href="{% url 'movimentar' produto.id %}" class="btn-mali estoque-edicao-movimentar">
+                        📦 Movimentar estoque
+                    </a>
+                </div>
 
-                <br>
+                <!-- Bloco 2: descrição -->
+                <div class="form-group estoque-edicao-descricao">
+                    <label>Descrição</label>
+                    <textarea name="descricao">{{ produto.descricao }}</textarea>
+                </div>
 
-                <label>Descrição</label>
-                <textarea name="descricao">{{ produto.descricao }}</textarea><br>
-
-                <button type="submit" class="btn-mali">Salvar Alterações</button>
-                <a href="{% url 'produtos' %}" class="btn-mali" style="background:#ccc; color:#333;">Cancelar</a>
+                <!-- Bloco 3: ações finais -->
+                <div class="form-actions estoque-edicao-botoes">
+                    <button type="submit" class="btn-mali">Salvar Alterações</button>
+                    <a href="{% url 'produtos' %}" class="btn-mali estoque-edicao-cancelar">Cancelar</a>
+                </div>
             </form>
 
             {% if mensagem %}
