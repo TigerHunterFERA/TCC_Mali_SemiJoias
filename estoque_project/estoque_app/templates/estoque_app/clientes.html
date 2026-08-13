@@ -1,0 +1,70 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Clientes</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="{% url 'pedidos' %}">🧾 Pedidos</a>
+        <a href="{% url 'clientes' %}">👥 Clientes</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+            <div>
+                <h1>Clientes</h1>
+                <p style="margin-top:6px; color:#6f6f6f;">Telefone para contato e futura integração com WhatsApp</p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <a href="{% url 'pagina_inicial' %}" class="btn-mali" style="background:#ccc; color:#333;">Voltar</a>
+            </div>
+        </header>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>E-mail</th>
+                        <th>Telefone</th>
+                        <th style="text-align:right;">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cliente in clientes %}
+                    <tr>
+                        <td style="font-weight: 700;">{{ cliente.nome }}</td>
+                        <td>{{ cliente.email }}</td>
+                        <td>
+                            {% if cliente.telefone %}
+                                {{ cliente.telefone_exibicao }}
+                            {% else %}
+                                <span style="color:#6f6f6f;">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align:right;">
+                            <a href="{% url 'editar_telefone_cliente' cliente.id %}" class="btn-mali" style="text-decoration:none; padding:8px 12px;">
+                                Editar telefone
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" style="text-align:center; padding:30px;">
+                            Nenhum cliente cadastrado.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+</body>
+</html>

@@ -17,6 +17,12 @@ urlpatterns = [
     ),
     path("movimentacoes/", views.listar_movimentacoes, name="movimentacoes"),
     path("pedidos/", views.listar_pedidos, name="pedidos"),
+    path("clientes/", views.listar_clientes, name="clientes"),
+    path(
+        "clientes/<int:cliente_id>/telefone/",
+        views.editar_telefone_cliente,
+        name="editar_telefone_cliente",
+    ),
     # pedidos/novo/ deve ficar ANTES de pedidos/<int:pedido_id>/
     path("pedidos/novo/", views.criar_pedido, name="novo_pedido"),
     path(

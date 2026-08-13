@@ -1,0 +1,60 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Editar Telefone</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="{% url 'pedidos' %}">🧾 Pedidos</a>
+        <a href="{% url 'clientes' %}">👥 Clientes</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+            <div>
+                <h1>Editar telefone</h1>
+                <p style="margin-top:6px; color:#6f6f6f;">
+                    Cliente: {{ cliente.nome }} ({{ cliente.email }})
+                </p>
+            </div>
+            <a href="{% url 'clientes' %}" class="btn-mali" style="background:#ccc; color:#333;">Voltar</a>
+        </header>
+
+        <div class="card">
+            {% if erro %}
+                <p style="color: red; font-weight: bold;">{{ erro }}</p>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+
+                <label for="telefone">Telefone</label>
+                <input
+                    type="text"
+                    name="telefone"
+                    id="telefone"
+                    value="{{ telefone }}"
+                    placeholder="Ex.: (18) 99809-2610"
+                    maxlength="25"
+                >
+                <p style="margin-top:8px; color:#6f6f6f; font-size:0.95em;">
+                    Pode ficar vazio. Aceita formatos como (18) 99809-2610
+                    ou +55 (18) 99123-4567; o sistema salva só os números.
+                </p>
+
+                <div style="margin-top: 16px; display:flex; gap:10px;">
+                    <button type="submit" class="btn-mali">Salvar</button>
+                    <a href="{% url 'clientes' %}" class="btn-mali" style="background:#ccc; color:#333;">Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

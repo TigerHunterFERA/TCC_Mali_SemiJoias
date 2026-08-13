@@ -78,7 +78,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido, Usuario
 from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
@@ -800,5 +800,124 @@ def adicionar_item_pedido(request, pedido_id):
         {
             "pedido": pedido,
             "produtos": produtos,
+        },
+    )
+
+
+def formatar_telefone_para_exibicao(telefone):
+    """
+    Formata telefone só para a tela (banco continua com dígitos).
+    Padrões: 10/11 dígitos nacionais ou 12/13 com DDI 55.
+    Se não casar, devolve os dígitos como estão.
+    """
+    if not telefone:
+        return ""
+
+    digitos = "".join(c for c in str(telefone) if c.isdigit())
+    if not digitos:
+        return ""
+
+    tamanho = len(digitos)
+
+    if tamanho == 11:
+        return f"({digitos[:2]}) {digitos[2:7]}-{digitos[7:]}"
+
+    if tamanho == 10:
+        return f"({digitos[:2]}) {digitos[2:6]}-{digitos[6:]}"
+
+    if tamanho == 13 and digitos.startswith("55"):
+        return f"+55 ({digitos[2:4]}) {digitos[4:9]}-{digitos[9:]}"
+
+    if tamanho == 12 and digitos.startswith("55"):
+        return f"+55 ({digitos[2:4]}) {digitos[4:8]}-{digitos[8:]}"
+
+    return digitos
+
+
+def validar_telefone_cliente(request):
+    """
+    Valida o telefone do cliente.
+    Vazio é permitido (salva como None).
+    Se preenchido, normaliza para só dígitos e valida o tamanho
+    (10/11 sem DDI, ou 12/13 com DDI 55). Não acrescenta 55 automaticamente.
+    Retorna (telefone, mensagem_de_erro).
+    """
+    telefone = (request.POST.get("telefone") or "").strip()
+
+    if not telefone:
+        return None, None
+
+    # Remove espaços, parênteses, hífen, + e demais não-dígitos; guarda só números.
+    telefone = "".join(c for c in telefone if c.isdigit())
+
+    mensagem_invalido = (
+        "Informe um telefone válido, como (18) 99809-2610 ou +55 (18) 99123-4567."
+    )
+
+    if not telefone:
+        return None, mensagem_invalido
+
+    tamanho = len(telefone)
+    valido_sem_ddi = tamanho in (10, 11)
+    valido_com_ddi = tamanho in (12, 13) and telefone.startswith("55")
+
+    if not (valido_sem_ddi or valido_com_ddi):
+        return telefone, mensagem_invalido
+
+    return telefone, None
+
+
+def listar_clientes(request):
+    """Lista usuários do tipo cliente (nome, e-mail e telefone)."""
+    clientes = Usuario.objects.filter(tipo="cliente").order_by("nome")
+
+    # Atributo só para a tela; o valor no banco permanece só com dígitos.
+    for cliente in clientes:
+        cliente.telefone_exibicao = formatar_telefone_para_exibicao(cliente.telefone)
+
+    return render(request, "estoque_app/clientes.html", {"clientes": clientes})
+
+
+def editar_telefone_cliente(request, cliente_id):
+    """Permite editar apenas o telefone de um cliente existente."""
+    cliente = get_object_or_404(Usuario, id=cliente_id, tipo="cliente")
+
+    if request.method == "POST":
+        telefone, erro = validar_telefone_cliente(request)
+
+        if erro:
+            return render(
+                request,
+                "estoque_app/editar_telefone_cliente.html",
+                {
+                    "cliente": cliente,
+                    "telefone": request.POST.get("telefone", ""),
+                    "erro": erro,
+                },
+            )
+
+        cliente.telefone = telefone
+
+        try:
+            cliente.save()
+        except IntegrityError:
+            return render(
+                request,
+                "estoque_app/editar_telefone_cliente.html",
+                {
+                    "cliente": cliente,
+                    "telefone": request.POST.get("telefone", ""),
+                    "erro": "Este telefone já está cadastrado para outro cliente.",
+                },
+            )
+
+        return redirect("clientes")
+
+    return render(
+        request,
+        "estoque_app/editar_telefone_cliente.html",
+        {
+            "cliente": cliente,
+            "telefone": formatar_telefone_para_exibicao(cliente.telefone),
         },
     )

@@ -36,6 +36,13 @@ class Usuario(models.Model):
     email = models.EmailField(unique=True)
     senha = models.CharField(max_length=255)
     tipo = models.CharField(max_length=10, choices=[('admin','Admin'),('cliente','Cliente')], default='cliente')
+    # Preparação para identificação futura por WhatsApp (opcional nos usuários antigos)
+    telefone = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True,
+    )
     criado_em = models.DateTimeField(auto_now_add=True)
     class Meta:
         db_table = 'usuarios'

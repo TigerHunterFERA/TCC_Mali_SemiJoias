@@ -13,6 +13,7 @@
         <a href="{% url 'dashboard' %}">📊 Dashboard</a>
         <a href="{% url 'produtos' %}">💍 Estoque</a>
         <a href="{% url 'pedidos' %}">🧾 Pedidos</a>
+        <a href="{% url 'clientes' %}">👥 Clientes</a>
     </nav>
 
     <main class="main-content">
@@ -43,6 +44,14 @@
                 <div>
                     <div class="action-title">Dashboard</div>
                     <div class="action-subtitle">Resumo do sistema</div>
+                </div>
+            </a>
+
+            <a href="{% url 'clientes' %}" class="action-card">
+                <div class="action-icon">👥</div>
+                <div>
+                    <div class="action-title">Clientes</div>
+                    <div class="action-subtitle">Telefone e preparação WhatsApp</div>
                 </div>
             </a>
 
