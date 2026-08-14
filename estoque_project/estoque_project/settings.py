@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -144,3 +145,9 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+# Integração mínima com o WAHA (Aula 14).
+# Valores vêm de variáveis de ambiente; a API Key não fica no código.
+WAHA_API_URL = os.getenv("WAHA_API_URL", "http://localhost:3000")
+WAHA_API_KEY = os.getenv("WAHA_API_KEY", "")
+WAHA_SESSION = os.getenv("WAHA_SESSION", "default")

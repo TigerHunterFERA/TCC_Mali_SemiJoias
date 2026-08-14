@@ -51,4 +51,5 @@ urlpatterns = [
         views.detalhe_pedido,
         name="detalhe_pedido",
     ),
+    path("waha/teste/", views.teste_waha, name="teste_waha"),
 ]

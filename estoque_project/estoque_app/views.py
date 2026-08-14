@@ -79,10 +79,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.db import transaction, IntegrityError
+from django.conf import settings
 from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido, Usuario
 from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
 import json
+import requests
 
 #def validar_produto(request):
 #    nome = (request.POST.get("nome") or "").strip()
@@ -921,3 +923,82 @@ def editar_telefone_cliente(request, cliente_id):
             "telefone": formatar_telefone_para_exibicao(cliente.telefone),
         },
     )
+
+
+def enviar_mensagem_waha(numero, mensagem):
+    """
+    Envia uma mensagem de texto pelo WAHA.
+    Retorna (True, texto) em sucesso ou (False, texto) em erro.
+    Não adiciona DDI 55 automaticamente.
+    """
+    digitos = "".join(c for c in str(numero) if c.isdigit())
+
+    if not digitos:
+        return False, "Informe um número válido."
+
+    if not mensagem or not str(mensagem).strip():
+        return False, "Informe a mensagem."
+
+    chat_id = f"{digitos}@c.us"
+    url = settings.WAHA_API_URL.rstrip("/") + "/api/sendText"
+
+    cabecalhos = {
+        "Content-Type": "application/json",
+        "X-Api-Key": settings.WAHA_API_KEY,
+    }
+    corpo = {
+        "session": settings.WAHA_SESSION,
+        "chatId": chat_id,
+        "text": str(mensagem).strip(),
+    }
+
+    try:
+        resposta = requests.post(
+            url,
+            json=corpo,
+            headers=cabecalhos,
+            timeout=15,
+        )
+    except requests.exceptions.RequestException:
+        return False, "Não foi possível conectar ao WAHA."
+
+    if resposta.status_code in (200, 201):
+        return True, "Mensagem enviada com sucesso pelo WAHA."
+
+    if resposta.status_code == 401:
+        return False, "Não autorizado pelo WAHA. Verifique a API Key."
+
+    return False, f"O WAHA retornou o status {resposta.status_code}."
+
+
+def teste_waha(request):
+    """Tela simples para provar o envio Django → WAHA → WhatsApp."""
+    contexto = {
+        "numero": "",
+        "mensagem": "Teste Mali Semijoias - Aula 14",
+    }
+
+    if request.method != "POST":
+        return render(request, "estoque_app/teste_waha.html", contexto)
+
+    numero = (request.POST.get("numero") or "").strip()
+    mensagem = (request.POST.get("mensagem") or "").strip()
+    contexto["numero"] = numero
+    contexto["mensagem"] = mensagem
+
+    if not numero:
+        contexto["erro"] = "Informe o número de destino."
+        return render(request, "estoque_app/teste_waha.html", contexto)
+
+    if not mensagem:
+        contexto["erro"] = "Informe a mensagem."
+        return render(request, "estoque_app/teste_waha.html", contexto)
+
+    sucesso, texto = enviar_mensagem_waha(numero, mensagem)
+
+    if sucesso:
+        contexto["sucesso"] = texto
+    else:
+        contexto["erro"] = texto
+
+    return render(request, "estoque_app/teste_waha.html", contexto)

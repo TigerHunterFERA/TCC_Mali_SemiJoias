@@ -1,0 +1,71 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Mali Semijoias - Teste WAHA</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    <nav class="sidebar">
+        <h2>MALI</h2>
+        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
+        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+        <a href="{% url 'produtos' %}">💍 Estoque</a>
+        <a href="{% url 'pedidos' %}">🧾 Pedidos</a>
+        <a href="{% url 'clientes' %}">👥 Clientes</a>
+    </nav>
+
+    <main class="main-content">
+        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
+            <div>
+                <h1>Teste WAHA</h1>
+                <p style="margin-top:6px; color:#6f6f6f;">
+                    Prova mínima de envio Django → WAHA → WhatsApp
+                </p>
+            </div>
+            <a href="{% url 'pagina_inicial' %}" class="btn-mali" style="background:#ccc; color:#333;">Voltar</a>
+        </header>
+
+        <div class="card">
+            {% if sucesso %}
+                <p style="color: green; font-weight: bold;">{{ sucesso }}</p>
+            {% endif %}
+
+            {% if erro %}
+                <p style="color: red; font-weight: bold;">{{ erro }}</p>
+            {% endif %}
+
+            <form method="POST">
+                {% csrf_token %}
+
+                <label for="numero">Número de destino</label>
+                <input
+                    type="text"
+                    name="numero"
+                    id="numero"
+                    value="{{ numero }}"
+                    placeholder="Ex.: 5518999999999"
+                    required
+                >
+                <p style="margin-top:8px; color:#6f6f6f; font-size:0.95em;">
+                    Use o número com DDI, sem máscara. Exemplo: 5518999999999.
+                    Esta tela não adiciona o 55 automaticamente.
+                </p>
+
+                <label for="mensagem" style="margin-top:16px; display:block;">Mensagem</label>
+                <textarea
+                    name="mensagem"
+                    id="mensagem"
+                    rows="4"
+                    required
+                >{{ mensagem }}</textarea>
+
+                <div style="margin-top: 16px; display:flex; gap:10px;">
+                    <button type="submit" class="btn-mali">Enviar mensagem</button>
+                </div>
+            </form>
+        </div>
+    </main>
+</body>
+</html>
