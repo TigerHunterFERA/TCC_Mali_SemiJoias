@@ -1161,6 +1161,44 @@ def salvar_cliente_whatsapp(nome, telefone):
         return None, None
 
 
+COMANDOS_CATALOGO_WHATSAPP = {
+    "produto",
+    "produtos",
+    "catalogo",
+    "catálogo",
+}
+
+
+def montar_catalogo_whatsapp():
+    """
+    Consulta produtos com estoque maior que zero e monta o texto do catálogo.
+    Retorna (texto, acao) para o webhook enviar pelo WhatsApp.
+    Não altera o estoque nem o preço armazenado no banco.
+    """
+    produtos = list(
+        Produto.objects.filter(estoque__gt=0).order_by("nome")
+    )
+
+    if not produtos:
+        return (
+            "No momento não temos produtos disponíveis em estoque.",
+            "catálogo vazio",
+        )
+
+    linhas = ["Produtos disponíveis:", ""]
+
+    for indice, produto in enumerate(produtos, start=1):
+        preco_texto = f"{produto.preco:.2f}".replace(".", ",")
+        linhas.append(f"{indice}. {produto.nome}")
+        linhas.append(f"Preço: R$ {preco_texto}")
+        linhas.append(f"Estoque: {produto.estoque}")
+        linhas.append("")
+
+    linhas.append("Envie o nome do produto que deseja conhecer melhor.")
+
+    return "\n".join(linhas).strip(), "catálogo enviado"
+
+
 @csrf_exempt
 @require_POST
 def webhook_waha(request):
@@ -1237,9 +1275,13 @@ def webhook_waha(request):
         ).first()
         if cliente:
             cliente_exibicao = cliente.nome
-            texto_resposta = (
-                f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
-            )
+            mensagem_normalizada = mensagem.strip().lower()
+            if mensagem_normalizada in COMANDOS_CATALOGO_WHATSAPP:
+                texto_resposta, acao_exibicao = montar_catalogo_whatsapp()
+            else:
+                texto_resposta = (
+                    f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
+                )
         elif telefone in telefones_aguardando_nome:
             nome_informado = mensagem.strip()
             if not validar_nome_whatsapp(nome_informado):
