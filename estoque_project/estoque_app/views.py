@@ -1086,6 +1086,40 @@ def obter_telefone_waha(identificador):
 telefones_aguardando_nome = set()
 
 
+def validar_nome_whatsapp(nome):
+    """
+    Validação mínima do nome informado pelo WhatsApp.
+    Exige nome e sobrenome, sem números e sem pontuação de pergunta/exclamação.
+    """
+    nome = (nome or "").strip()
+
+    if not nome:
+        return False
+
+    if len(nome) > 100:
+        return False
+
+    if "?" in nome or "!" in nome:
+        return False
+
+    if any(caractere.isdigit() for caractere in nome):
+        return False
+
+    palavras = nome.split()
+    if len(palavras) < 2:
+        return False
+
+    for palavra in palavras:
+        if len(palavra) < 2:
+            return False
+
+        for caractere in palavra:
+            if not (caractere.isalpha() or caractere in "-'"):
+                return False
+
+    return True
+
+
 def salvar_cliente_whatsapp(nome, telefone):
     """
     Reutiliza cliente com o mesmo nome e telefone vazio,
@@ -1208,19 +1242,27 @@ def webhook_waha(request):
             )
         elif telefone in telefones_aguardando_nome:
             nome_informado = mensagem.strip()
-            cliente, acao_exibicao = salvar_cliente_whatsapp(
-                nome_informado,
-                telefone,
-            )
-            if cliente:
-                telefones_aguardando_nome.discard(telefone)
-                cliente_exibicao = cliente.nome
+            if not validar_nome_whatsapp(nome_informado):
+                cliente_exibicao = "não identificado"
+                acao_exibicao = "nome inválido"
                 texto_resposta = (
-                    f"Cadastro concluído, {cliente.nome}! "
-                    "Bem-vindo à Mali Semijoias."
+                    "Não consegui identificar um nome válido. "
+                    "Por favor, informe seu nome e sobrenome."
                 )
             else:
-                cliente_exibicao = "não identificado"
+                cliente, acao_exibicao = salvar_cliente_whatsapp(
+                    nome_informado,
+                    telefone,
+                )
+                if cliente:
+                    telefones_aguardando_nome.discard(telefone)
+                    cliente_exibicao = cliente.nome
+                    texto_resposta = (
+                        f"Cadastro concluído, {cliente.nome}! "
+                        "Bem-vindo à Mali Semijoias."
+                    )
+                else:
+                    cliente_exibicao = "não identificado"
         else:
             cliente_exibicao = "não identificado"
             telefones_aguardando_nome.add(telefone)
