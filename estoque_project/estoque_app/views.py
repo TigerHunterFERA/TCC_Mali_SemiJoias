@@ -1090,6 +1090,11 @@ telefones_aguardando_nome = set()
 # Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
 clientes_aguardando_produto = {}
 
+# Estado temporário em memória (Aula 18.3).
+# telefone -> id do produto selecionado, aguardando a quantidade.
+# Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
+clientes_aguardando_quantidade = {}
+
 
 def validar_nome_whatsapp(nome):
     """
@@ -1212,11 +1217,12 @@ def interpretar_selecao_produto_whatsapp(mensagem, ids_produtos):
     """
     Interpreta o número enviado pelo cliente.
     ids_produtos é a lista de ids na mesma ordem do catálogo exibido.
-    Retorna (texto, acao, nome_produto).
+    Retorna (texto, acao, nome_produto, produto_id).
     """
     texto_invalido = (
         "Opção inválida. Envie o número de um produto exibido no catálogo.",
         "seleção de produto inválida",
+        None,
         None,
     )
     mensagem = (mensagem or "").strip()
@@ -1241,9 +1247,56 @@ def interpretar_selecao_produto_whatsapp(mensagem, ids_produtos):
         f"Preço: R$ {preco_texto}\n"
         f"Estoque disponível: {produto.estoque}\n"
         "\n"
-        "Na próxima etapa você poderá informar a quantidade desejada."
+        "Quantas unidades você deseja?"
     )
-    return texto, "produto selecionado", produto.nome
+    return texto, "produto selecionado", produto.nome, produto.id
+
+
+def interpretar_quantidade_whatsapp(mensagem, produto_id):
+    """
+    Interpreta a quantidade informada pelo cliente.
+    Busca o produto novamente e não altera o banco.
+    Retorna (texto, acao, nome_produto, quantidade).
+    """
+    produto = Produto.objects.filter(id=produto_id).first()
+    if not produto or produto.estoque <= 0:
+        return (
+            "O produto selecionado não está mais disponível. "
+            "Envie 'produtos' para consultar o catálogo novamente.",
+            "produto indisponível",
+            None,
+            None,
+        )
+
+    mensagem = (mensagem or "").strip()
+    texto_invalido = (
+        f"Quantidade inválida. Informe um número entre 1 e {produto.estoque}.",
+        "quantidade inválida",
+        None,
+        None,
+    )
+
+    if not mensagem.isdigit():
+        return texto_invalido
+
+    quantidade = int(mensagem)
+    if quantidade < 1 or quantidade > produto.estoque:
+        return texto_invalido
+
+    preco_texto = f"{produto.preco:.2f}".replace(".", ",")
+    subtotal = produto.preco * quantidade
+    subtotal_texto = f"{subtotal:.2f}".replace(".", ",")
+    texto = (
+        "Quantidade registrada:\n"
+        "\n"
+        f"Produto: {produto.nome}\n"
+        f"Quantidade: {quantidade}\n"
+        f"Valor unitário: R$ {preco_texto}\n"
+        f"Subtotal: R$ {subtotal_texto}\n"
+        "\n"
+        "Na próxima etapa o pedido poderá ser criado."
+    )
+    return texto, "quantidade registrada", produto.nome, quantidade
 
 
 @csrf_exempt
@@ -1314,6 +1367,7 @@ def webhook_waha(request):
     texto_resposta = None
     nome_informado = None
     produto_exibicao = None
+    quantidade_exibicao = None
 
     if telefone:
         telefone_exibicao = telefone
@@ -1324,8 +1378,9 @@ def webhook_waha(request):
         if cliente:
             cliente_exibicao = cliente.nome
             mensagem_normalizada = mensagem.strip().lower()
-            # Novo catálogo substitui o estado anterior, se existir.
+            # Novo catálogo cancela quantidade em andamento e substitui a lista.
             if mensagem_normalizada in COMANDOS_CATALOGO_WHATSAPP:
+                clientes_aguardando_quantidade.pop(telefone, None)
                 texto_resposta, acao_exibicao, ids_catalogo = (
                     montar_catalogo_whatsapp()
                 )
@@ -1333,16 +1388,35 @@ def webhook_waha(request):
                     clientes_aguardando_produto[telefone] = ids_catalogo
                 else:
                     clientes_aguardando_produto.pop(telefone, None)
+            elif telefone in clientes_aguardando_quantidade:
+                produto_id = clientes_aguardando_quantidade[telefone]
+                (
+                    texto_resposta,
+                    acao_exibicao,
+                    produto_exibicao,
+                    quantidade_exibicao,
+                ) = interpretar_quantidade_whatsapp(mensagem, produto_id)
+                if acao_exibicao in (
+                    "quantidade registrada",
+                    "produto indisponível",
+                ):
+                    clientes_aguardando_quantidade.pop(telefone, None)
             elif telefone in clientes_aguardando_produto:
                 ids_catalogo = clientes_aguardando_produto[telefone]
-                texto_resposta, acao_exibicao, produto_exibicao = (
-                    interpretar_selecao_produto_whatsapp(
-                        mensagem,
-                        ids_catalogo,
-                    )
+                (
+                    texto_resposta,
+                    acao_exibicao,
+                    produto_exibicao,
+                    produto_id_selecionado,
+                ) = interpretar_selecao_produto_whatsapp(
+                    mensagem,
+                    ids_catalogo,
                 )
                 if acao_exibicao == "produto selecionado":
                     clientes_aguardando_produto.pop(telefone, None)
+                    clientes_aguardando_quantidade[telefone] = (
+                        produto_id_selecionado
+                    )
             else:
                 texto_resposta = (
                     f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
@@ -1400,6 +1474,8 @@ def webhook_waha(request):
         print(f"Nome informado: {nome_informado}")
     if produto_exibicao:
         print(f"Produto: {produto_exibicao}")
+    if quantidade_exibicao is not None:
+        print(f"Quantidade: {quantidade_exibicao}")
     print(f"Resposta automática: {resposta_exibicao}")
     print("=================================")
 
