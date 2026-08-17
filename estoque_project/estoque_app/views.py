@@ -1095,6 +1095,11 @@ clientes_aguardando_produto = {}
 # Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
 clientes_aguardando_quantidade = {}
 
+# Estado temporário em memória (Aula 18.4).
+# telefone -> {"produto_id": id, "quantidade": n}, aguardando SIM/NÃO.
+# Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
+clientes_aguardando_confirmacao = {}
+
 
 def validar_nome_whatsapp(nome):
     """
@@ -1287,16 +1292,54 @@ def interpretar_quantidade_whatsapp(mensagem, produto_id):
     subtotal = produto.preco * quantidade
     subtotal_texto = f"{subtotal:.2f}".replace(".", ",")
     texto = (
-        "Quantidade registrada:\n"
+        "Resumo da compra:\n"
         "\n"
         f"Produto: {produto.nome}\n"
         f"Quantidade: {quantidade}\n"
         f"Valor unitário: R$ {preco_texto}\n"
-        f"Subtotal: R$ {subtotal_texto}\n"
+        f"Total: R$ {subtotal_texto}\n"
         "\n"
-        "Na próxima etapa o pedido poderá ser criado."
+        "Deseja confirmar o pedido?\n"
+        "Responda SIM ou NÃO."
     )
     return texto, "quantidade registrada", produto.nome, quantidade
+
+
+def interpretar_confirmacao_whatsapp(mensagem, dados):
+    """
+    Interpreta SIM ou NÃO antes de criar o pedido.
+    dados = {"produto_id": id, "quantidade": n}
+    Não cria Pedido nem altera estoque.
+    Retorna (texto, acao).
+    """
+    mensagem = (mensagem or "").strip().lower()
+
+    if mensagem in ("nao", "não"):
+        return (
+            "Pedido cancelado. Envie 'produtos' para consultar o catálogo novamente.",
+            "confirmação cancelada",
+        )
+
+    if mensagem != "sim":
+        return (
+            "Confirmação inválida. Responda SIM ou NÃO.",
+            "confirmação inválida",
+        )
+
+    produto_id = dados.get("produto_id")
+    quantidade = dados.get("quantidade")
+    produto = Produto.objects.filter(id=produto_id).first()
+    if not produto or produto.estoque < quantidade:
+        return (
+            "O produto não está mais disponível na quantidade solicitada. "
+            "Envie 'produtos' para consultar o catálogo novamente.",
+            "produto indisponível",
+        )
+
+    return (
+        "Confirmação recebida. O pedido será criado na próxima etapa.",
+        "confirmação de pedido recebida",
+    )
 
 
 @csrf_exempt
@@ -1378,9 +1421,10 @@ def webhook_waha(request):
         if cliente:
             cliente_exibicao = cliente.nome
             mensagem_normalizada = mensagem.strip().lower()
-            # Novo catálogo cancela quantidade em andamento e substitui a lista.
+            # Novo catálogo cancela quantidade/confirmação e substitui a lista.
             if mensagem_normalizada in COMANDOS_CATALOGO_WHATSAPP:
                 clientes_aguardando_quantidade.pop(telefone, None)
+                clientes_aguardando_confirmacao.pop(telefone, None)
                 texto_resposta, acao_exibicao, ids_catalogo = (
                     montar_catalogo_whatsapp()
                 )
@@ -1388,6 +1432,19 @@ def webhook_waha(request):
                     clientes_aguardando_produto[telefone] = ids_catalogo
                 else:
                     clientes_aguardando_produto.pop(telefone, None)
+            elif telefone in clientes_aguardando_confirmacao:
+                dados_confirmacao = clientes_aguardando_confirmacao[telefone]
+                texto_resposta, acao_exibicao = (
+                    interpretar_confirmacao_whatsapp(
+                        mensagem,
+                        dados_confirmacao,
+                    )
+                )
+                if acao_exibicao in (
+                    "confirmação cancelada",
+                    "produto indisponível",
+                ):
+                    clientes_aguardando_confirmacao.pop(telefone, None)
             elif telefone in clientes_aguardando_quantidade:
                 produto_id = clientes_aguardando_quantidade[telefone]
                 (
@@ -1396,10 +1453,13 @@ def webhook_waha(request):
                     produto_exibicao,
                     quantidade_exibicao,
                 ) = interpretar_quantidade_whatsapp(mensagem, produto_id)
-                if acao_exibicao in (
-                    "quantidade registrada",
-                    "produto indisponível",
-                ):
+                if acao_exibicao == "quantidade registrada":
+                    clientes_aguardando_quantidade.pop(telefone, None)
+                    clientes_aguardando_confirmacao[telefone] = {
+                        "produto_id": produto_id,
+                        "quantidade": quantidade_exibicao,
+                    }
+                elif acao_exibicao == "produto indisponível":
                     clientes_aguardando_quantidade.pop(telefone, None)
             elif telefone in clientes_aguardando_produto:
                 ids_catalogo = clientes_aguardando_produto[telefone]
