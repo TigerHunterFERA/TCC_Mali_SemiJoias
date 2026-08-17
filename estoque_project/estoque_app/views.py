@@ -87,6 +87,7 @@ from decimal import Decimal, InvalidOperation
 # from django.shortcuts import render, redirect
 import json
 import requests
+from urllib.parse import quote
 
 #def validar_produto(request):
 #    nome = (request.POST.get("nome") or "").strip()
@@ -1006,6 +1007,78 @@ def teste_waha(request):
     return render(request, "estoque_app/teste_waha.html", contexto)
 
 
+def obter_telefone_waha(identificador):
+    """
+    Converte o identificador do WAHA em telefone (só dígitos).
+    @c.us: usa o próprio identificador, sem chamar a API.
+    @lid: consulta GET /api/{session}/lids/{lid}.
+    Em qualquer falha, devolve None sem quebrar o webhook.
+    """
+    identificador = str(identificador or "").strip()
+
+    if not identificador:
+        return None
+
+    if identificador.endswith("@c.us"):
+        telefone = identificador[:-len("@c.us")]
+        digitos = "".join(c for c in telefone if c.isdigit())
+        if not digitos:
+            return None
+        return digitos
+
+    if not identificador.endswith("@lid"):
+        return None
+
+    url = (
+        settings.WAHA_API_URL.rstrip("/")
+        + "/api/"
+        + quote(str(settings.WAHA_SESSION), safe="")
+        + "/lids/"
+        + quote(identificador, safe="")
+    )
+    cabecalhos = {
+        "X-Api-Key": settings.WAHA_API_KEY,
+    }
+
+    try:
+        resposta = requests.get(url, headers=cabecalhos, timeout=15)
+    except requests.exceptions.RequestException:
+        print("Não foi possível consultar o LID no WAHA.")
+        return None
+
+    if resposta.status_code != 200:
+        print(f"WAHA retornou status {resposta.status_code} na consulta do LID.")
+        return None
+
+    try:
+        dados = resposta.json()
+    except ValueError:
+        print("Resposta inesperada do WAHA na consulta do LID.")
+        return None
+
+    if not isinstance(dados, dict):
+        print("Resposta inesperada do WAHA na consulta do LID.")
+        return None
+
+    pn = dados.get("pn")
+    if not pn:
+        print("WAHA não encontrou telefone para este LID.")
+        return None
+
+    pn = str(pn)
+    if pn.endswith("@c.us"):
+        telefone = pn[:-len("@c.us")]
+    else:
+        telefone = pn
+
+    digitos = "".join(c for c in telefone if c.isdigit())
+    if not digitos:
+        print("WAHA não encontrou telefone para este LID.")
+        return None
+
+    return digitos
+
+
 @csrf_exempt
 @require_POST
 def webhook_waha(request):
@@ -1068,10 +1141,39 @@ def webhook_waha(request):
     else:
         identificador_exibicao = remetente
 
+    telefone = obter_telefone_waha(remetente)
+    cliente = None
+    resposta_exibicao = "não enviada"
+
+    if telefone:
+        telefone_exibicao = telefone
+        cliente = Usuario.objects.filter(
+            telefone=telefone,
+            tipo="cliente",
+        ).first()
+        if cliente:
+            cliente_exibicao = cliente.nome
+            texto_resposta = (
+                f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
+            )
+            sucesso_envio, _ = enviar_mensagem_waha(telefone, texto_resposta)
+            if sucesso_envio:
+                resposta_exibicao = "enviada"
+            else:
+                print("Não foi possível enviar a resposta automática pelo WAHA.")
+        else:
+            cliente_exibicao = "não identificado"
+    else:
+        telefone_exibicao = "não identificado"
+        cliente_exibicao = "não identificado"
+
     print("=== MENSAGEM RECEBIDA DO WAHA ===")
     print(f"Sessão: {sessao}")
     print(f"Identificador: {identificador_exibicao}")
+    print(f"Telefone: {telefone_exibicao}")
+    print(f"Cliente: {cliente_exibicao}")
     print(f"Mensagem: {mensagem}")
+    print(f"Resposta automática: {resposta_exibicao}")
     print("=================================")
 
     return JsonResponse({"status": "ok"}, status=200)
