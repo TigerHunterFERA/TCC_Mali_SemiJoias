@@ -77,7 +77,9 @@
 #     return redirect("produtos")
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction, IntegrityError
 from django.conf import settings
 from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido, Usuario
@@ -1002,3 +1004,74 @@ def teste_waha(request):
         contexto["erro"] = texto
 
     return render(request, "estoque_app/teste_waha.html", contexto)
+
+
+@csrf_exempt
+@require_POST
+def webhook_waha(request):
+    """
+    Receptor mínimo do WAHA.
+    Só lê o JSON, imprime no terminal e responde HTTP 200.
+    Não envia resposta automática.
+    """
+    try:
+        dados = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return JsonResponse(
+            {"status": "erro", "mensagem": "JSON inválido."},
+            status=400,
+        )
+
+    if not isinstance(dados, dict):
+        return JsonResponse(
+            {"status": "erro", "mensagem": "JSON inválido."},
+            status=400,
+        )
+
+    evento = dados.get("event")
+    sessao = dados.get("session")
+    payload = dados.get("payload") or {}
+
+    if not isinstance(payload, dict):
+        payload = {}
+
+    # Outros eventos do WAHA são ignorados nesta etapa
+    if evento != "message":
+        return JsonResponse({"status": "ok"}, status=200)
+
+    # Mensagem enviada pelo próprio número conectado
+    if payload.get("fromMe") is True:
+        return JsonResponse({"status": "ok"}, status=200)
+
+    remetente = str(payload.get("from") or "")
+    mensagem = str(payload.get("body") or "")
+
+    # Grupo: não processar nesta versão
+    if remetente.endswith("@g.us"):
+        return JsonResponse({"status": "ok"}, status=200)
+
+    # Status do WhatsApp
+    if remetente == "status@broadcast":
+        return JsonResponse({"status": "ok"}, status=200)
+
+    # Canal
+    if remetente.endswith("@newsletter"):
+        return JsonResponse({"status": "ok"}, status=200)
+
+    # Sem texto (mídia, figurinha, evento vazio etc.)
+    if not mensagem.strip():
+        return JsonResponse({"status": "ok"}, status=200)
+
+    # @c.us: mostra só o número. @lid: mantém o identificador completo.
+    if remetente.endswith("@c.us"):
+        identificador_exibicao = remetente[:-len("@c.us")]
+    else:
+        identificador_exibicao = remetente
+
+    print("=== MENSAGEM RECEBIDA DO WAHA ===")
+    print(f"Sessão: {sessao}")
+    print(f"Identificador: {identificador_exibicao}")
+    print(f"Mensagem: {mensagem}")
+    print("=================================")
+
+    return JsonResponse({"status": "ok"}, status=200)
