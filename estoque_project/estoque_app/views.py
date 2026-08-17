@@ -81,6 +81,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction, IntegrityError
+from django.db.models import Q
 from django.conf import settings
 from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido, Usuario
 from decimal import Decimal, InvalidOperation
@@ -1079,13 +1080,59 @@ def obter_telefone_waha(identificador):
     return digitos
 
 
+# Estado temporário em memória (Aula 17).
+# Guarda telefones que já receberam o pedido de nome.
+# Se o Django reiniciar, este conjunto é perdido — esperado nesta etapa.
+telefones_aguardando_nome = set()
+
+
+def salvar_cliente_whatsapp(nome, telefone):
+    """
+    Reutiliza cliente com o mesmo nome e telefone vazio,
+    ou cria um novo Usuario.
+    Email e senha técnicos existem só porque o model exige esses campos.
+    O login atual do sistema ainda não usa a tabela usuarios.
+    """
+    nome = (nome or "").strip()
+    if not nome:
+        print("Nome informado está vazio. Cadastro não realizado.")
+        return None, None
+
+    if len(nome) > 100:
+        print("Nome informado é longo demais. Cadastro não realizado.")
+        return None, None
+
+    try:
+        cliente = (
+            Usuario.objects.filter(nome=nome, tipo="cliente")
+            .filter(Q(telefone__isnull=True) | Q(telefone=""))
+            .first()
+        )
+
+        if cliente:
+            cliente.telefone = telefone
+            cliente.save()
+            return cliente, "cliente existente atualizado"
+
+        cliente = Usuario.objects.create(
+            nome=nome,
+            email=f"whatsapp_{telefone}@mali.local",
+            senha="whatsapp",
+            tipo="cliente",
+            telefone=telefone,
+        )
+        return cliente, "novo cliente criado"
+    except Exception:
+        print("Não foi possível salvar o cliente do WhatsApp.")
+        return None, None
+
+
 @csrf_exempt
 @require_POST
 def webhook_waha(request):
     """
-    Receptor mínimo do WAHA.
-    Só lê o JSON, imprime no terminal e responde HTTP 200.
-    Não envia resposta automática.
+    Receptor do WAHA.
+    Lê o JSON, identifica o cliente pelo telefone e responde de forma simples.
     """
     try:
         dados = json.loads(request.body)
@@ -1144,6 +1191,9 @@ def webhook_waha(request):
     telefone = obter_telefone_waha(remetente)
     cliente = None
     resposta_exibicao = "não enviada"
+    acao_exibicao = None
+    texto_resposta = None
+    nome_informado = None
 
     if telefone:
         telefone_exibicao = telefone
@@ -1156,16 +1206,38 @@ def webhook_waha(request):
             texto_resposta = (
                 f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
             )
-            sucesso_envio, _ = enviar_mensagem_waha(telefone, texto_resposta)
-            if sucesso_envio:
-                resposta_exibicao = "enviada"
+        elif telefone in telefones_aguardando_nome:
+            nome_informado = mensagem.strip()
+            cliente, acao_exibicao = salvar_cliente_whatsapp(
+                nome_informado,
+                telefone,
+            )
+            if cliente:
+                telefones_aguardando_nome.discard(telefone)
+                cliente_exibicao = cliente.nome
+                texto_resposta = (
+                    f"Cadastro concluído, {cliente.nome}! "
+                    "Bem-vindo à Mali Semijoias."
+                )
             else:
-                print("Não foi possível enviar a resposta automática pelo WAHA.")
+                cliente_exibicao = "não identificado"
         else:
             cliente_exibicao = "não identificado"
+            telefones_aguardando_nome.add(telefone)
+            acao_exibicao = "solicitando nome"
+            texto_resposta = (
+                "Olá! Não encontrei seu cadastro. Qual é o seu nome?"
+            )
     else:
         telefone_exibicao = "não identificado"
         cliente_exibicao = "não identificado"
+
+    if texto_resposta:
+        sucesso_envio, _ = enviar_mensagem_waha(telefone, texto_resposta)
+        if sucesso_envio:
+            resposta_exibicao = "enviada"
+        else:
+            print("Não foi possível enviar a resposta automática pelo WAHA.")
 
     print("=== MENSAGEM RECEBIDA DO WAHA ===")
     print(f"Sessão: {sessao}")
@@ -1173,6 +1245,10 @@ def webhook_waha(request):
     print(f"Telefone: {telefone_exibicao}")
     print(f"Cliente: {cliente_exibicao}")
     print(f"Mensagem: {mensagem}")
+    if acao_exibicao:
+        print(f"Ação: {acao_exibicao}")
+    if nome_informado:
+        print(f"Nome informado: {nome_informado}")
     print(f"Resposta automática: {resposta_exibicao}")
     print("=================================")
 
