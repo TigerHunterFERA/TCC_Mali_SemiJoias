@@ -1305,12 +1305,12 @@ def interpretar_quantidade_whatsapp(mensagem, produto_id):
     return texto, "quantidade registrada", produto.nome, quantidade
 
 
-def interpretar_confirmacao_whatsapp(mensagem, dados):
+def interpretar_confirmacao_whatsapp(mensagem, dados, cliente):
     """
-    Interpreta SIM ou NÃO antes de criar o pedido.
-    dados = {"produto_id": id, "quantidade": n}
-    Não cria Pedido nem altera estoque.
-    Retorna (texto, acao).
+    Interpreta SIM ou NÃO.
+    No SIM, cria Pedido e ItemPedido sem baixar estoque
+    (a baixa no sistema web ocorre somente no pagamento).
+    Retorna (texto, acao, pedido_id, nome_produto, quantidade).
     """
     mensagem = (mensagem or "").strip().lower()
 
@@ -1318,28 +1318,82 @@ def interpretar_confirmacao_whatsapp(mensagem, dados):
         return (
             "Pedido cancelado. Envie 'produtos' para consultar o catálogo novamente.",
             "confirmação cancelada",
+            None,
+            None,
+            None,
         )
 
     if mensagem != "sim":
         return (
             "Confirmação inválida. Responda SIM ou NÃO.",
             "confirmação inválida",
+            None,
+            None,
+            None,
         )
 
-    produto_id = dados.get("produto_id")
-    quantidade = dados.get("quantidade")
-    produto = Produto.objects.filter(id=produto_id).first()
-    if not produto or produto.estoque < quantidade:
-        return (
-            "O produto não está mais disponível na quantidade solicitada. "
-            "Envie 'produtos' para consultar o catálogo novamente.",
-            "produto indisponível",
-        )
-
-    return (
-        "Confirmação recebida. O pedido será criado na próxima etapa.",
-        "confirmação de pedido recebida",
+    return criar_pedido_whatsapp(
+        cliente,
+        dados.get("produto_id"),
+        dados.get("quantidade"),
     )
+
+
+def criar_pedido_whatsapp(cliente, produto_id, quantidade):
+    """
+    Cria Pedido + ItemPedido em uma transação.
+    Status inicial: pendente (mesmo padrão da tela web).
+    Não baixa estoque nem cria MovimentacaoEstoque.
+    """
+    try:
+        with transaction.atomic():
+            produto = Produto.objects.filter(id=produto_id).first()
+            if not produto or produto.estoque < quantidade:
+                return (
+                    "O produto não está mais disponível na quantidade solicitada. "
+                    "Envie 'produtos' para consultar o catálogo novamente.",
+                    "produto indisponível",
+                    None,
+                    None,
+                    None,
+                )
+
+            pedido = Pedido.objects.create(usuario=cliente)
+            ItemPedido.objects.create(
+                pedido=pedido,
+                produto=produto,
+                quantidade=quantidade,
+                preco_unitario=produto.preco,
+            )
+
+            total = produto.preco * quantidade
+            total_texto = f"{total:.2f}".replace(".", ",")
+            texto = (
+                "Pedido realizado com sucesso!\n"
+                "\n"
+                f"Número do pedido: {pedido.id}\n"
+                f"Produto: {produto.nome}\n"
+                f"Quantidade: {quantidade}\n"
+                f"Total: R$ {total_texto}\n"
+                "\n"
+                "Acompanhe seu pedido conosco pelo WhatsApp."
+            )
+            return (
+                texto,
+                "pedido criado",
+                pedido.id,
+                produto.nome,
+                quantidade,
+            )
+    except Exception:
+        print("Não foi possível criar o pedido do WhatsApp.")
+        return (
+            "Não foi possível criar seu pedido agora. Tente novamente em alguns instantes.",
+            "erro ao criar pedido",
+            None,
+            None,
+            None,
+        )
 
 
 @csrf_exempt
@@ -1411,6 +1465,7 @@ def webhook_waha(request):
     nome_informado = None
     produto_exibicao = None
     quantidade_exibicao = None
+    pedido_exibicao = None
 
     if telefone:
         telefone_exibicao = telefone
@@ -1434,15 +1489,21 @@ def webhook_waha(request):
                     clientes_aguardando_produto.pop(telefone, None)
             elif telefone in clientes_aguardando_confirmacao:
                 dados_confirmacao = clientes_aguardando_confirmacao[telefone]
-                texto_resposta, acao_exibicao = (
-                    interpretar_confirmacao_whatsapp(
-                        mensagem,
-                        dados_confirmacao,
-                    )
+                (
+                    texto_resposta,
+                    acao_exibicao,
+                    pedido_exibicao,
+                    produto_exibicao,
+                    quantidade_exibicao,
+                ) = interpretar_confirmacao_whatsapp(
+                    mensagem,
+                    dados_confirmacao,
+                    cliente,
                 )
                 if acao_exibicao in (
                     "confirmação cancelada",
                     "produto indisponível",
+                    "pedido criado",
                 ):
                     clientes_aguardando_confirmacao.pop(telefone, None)
             elif telefone in clientes_aguardando_quantidade:
@@ -1536,6 +1597,8 @@ def webhook_waha(request):
         print(f"Produto: {produto_exibicao}")
     if quantidade_exibicao is not None:
         print(f"Quantidade: {quantidade_exibicao}")
+    if pedido_exibicao:
+        print(f"Pedido: {pedido_exibicao}")
     print(f"Resposta automática: {resposta_exibicao}")
     print("=================================")
 
