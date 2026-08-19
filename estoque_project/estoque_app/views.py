@@ -1183,6 +1183,13 @@ COMANDOS_CATALOGO_WHATSAPP = {
     "catálogo",
 }
 
+COMANDOS_PEDIDOS_WHATSAPP = {
+    "pedido",
+    "pedidos",
+    "meu pedido",
+    "meus pedidos",
+}
+
 
 def montar_catalogo_whatsapp():
     """
@@ -1216,6 +1223,42 @@ def montar_catalogo_whatsapp():
     linhas.append("Envie o número do produto que deseja conhecer melhor.")
 
     return "\n".join(linhas).strip(), "catálogo enviado", ids
+
+
+def montar_pedidos_whatsapp(cliente):
+    """
+    Consulta somente os pedidos do cliente identificado.
+    Total usa quantidade * preco_unitario de cada ItemPedido.
+    Somente leitura: não cria pedido nem altera estoque.
+    """
+    pedidos = list(
+        Pedido.objects.filter(usuario=cliente)
+        .order_by("-data_pedido")[:5]
+    )
+
+    if not pedidos:
+        return (
+            "Você ainda não possui pedidos cadastrados.",
+            "pedidos vazios",
+        )
+
+    linhas = ["Meus pedidos:", ""]
+
+    for pedido in pedidos:
+        itens = ItemPedido.objects.filter(pedido=pedido)
+        total = Decimal("0")
+        for item in itens:
+            total = total + (item.quantidade * item.preco_unitario)
+
+        total_texto = f"{total:.2f}".replace(".", ",")
+        data_texto = pedido.data_pedido.strftime("%d/%m/%Y")
+        linhas.append(f"Pedido #{pedido.id}")
+        linhas.append(f"Status: {pedido.get_status_display()}")
+        linhas.append(f"Data: {data_texto}")
+        linhas.append(f"Total: R$ {total_texto}")
+        linhas.append("")
+
+    return "\n".join(linhas).strip(), "pedidos enviados"
 
 
 def interpretar_selecao_produto_whatsapp(mensagem, ids_produtos):
@@ -1538,6 +1581,8 @@ def webhook_waha(request):
                     clientes_aguardando_quantidade[telefone] = (
                         produto_id_selecionado
                     )
+            elif mensagem_normalizada in COMANDOS_PEDIDOS_WHATSAPP:
+                texto_resposta, acao_exibicao = montar_pedidos_whatsapp(cliente)
             else:
                 texto_resposta = (
                     f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
