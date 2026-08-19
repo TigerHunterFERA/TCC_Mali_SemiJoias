@@ -1200,6 +1200,12 @@ COMANDOS_FINALIZAR_WHATSAPP = {
     "finalizar pedido",
 }
 
+COMANDOS_PAGAMENTO_WHATSAPP = {
+    "pagamento",
+    "pagar",
+    "pix",
+}
+
 
 def montar_catalogo_whatsapp():
     """
@@ -1356,6 +1362,42 @@ def interpretar_finalizacao_whatsapp(mensagem, pedido_id, cliente):
         "Aguarde as instruções de pagamento."
     )
     return texto, "pedido aguardando pagamento", pedido.id
+
+
+def montar_instrucoes_pagamento_whatsapp(cliente):
+    """
+    Envia instruções de Pix do pedido aguardando pagamento mais recente.
+    Somente leitura: não altera status, estoque nem movimentação.
+    A chave Pix ainda não existe no projeto — placeholder para configuração futura.
+    """
+    pedido = (
+        Pedido.objects.filter(
+            usuario=cliente,
+            status="aguardando_pagamento",
+        )
+        .order_by("-data_pedido")
+        .first()
+    )
+    if not pedido:
+        return (
+            "Você não possui pedido aguardando pagamento.",
+            "pagamento não disponível",
+            None,
+        )
+
+    total_texto = f"{calcular_total_pedido(pedido):.2f}".replace(".", ",")
+    texto = (
+        f"Pedido #{pedido.id}\n"
+        f"Total: R$ {total_texto}\n"
+        f"Status: {pedido.get_status_display()}\n"
+        "\n"
+        "Forma de pagamento: Pix\n"
+        "\n"
+        "Chave Pix: CONFIGURAR_CHAVE_PIX\n"
+        "\n"
+        "Após realizar o pagamento, aguarde a confirmação da loja."
+    )
+    return texto, "instruções de pagamento enviadas", pedido.id
 
 
 def interpretar_selecao_produto_whatsapp(mensagem, ids_produtos):
@@ -1707,6 +1749,10 @@ def webhook_waha(request):
                         pedido_id_finalizacao
                     )
                 pedido_exibicao = pedido_id_finalizacao
+            elif mensagem_normalizada in COMANDOS_PAGAMENTO_WHATSAPP:
+                texto_resposta, acao_exibicao, pedido_exibicao = (
+                    montar_instrucoes_pagamento_whatsapp(cliente)
+                )
             else:
                 texto_resposta = (
                     f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
