@@ -1100,6 +1100,11 @@ clientes_aguardando_quantidade = {}
 # Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
 clientes_aguardando_confirmacao = {}
 
+# Estado temporário em memória (Aula 19.2).
+# telefone -> id do pedido pendente, aguardando SIM/NÃO para finalizar.
+# Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
+clientes_aguardando_finalizacao = {}
+
 
 def validar_nome_whatsapp(nome):
     """
@@ -1190,6 +1195,11 @@ COMANDOS_PEDIDOS_WHATSAPP = {
     "meus pedidos",
 }
 
+COMANDOS_FINALIZAR_WHATSAPP = {
+    "finalizar",
+    "finalizar pedido",
+}
+
 
 def montar_catalogo_whatsapp():
     """
@@ -1259,6 +1269,93 @@ def montar_pedidos_whatsapp(cliente):
         linhas.append("")
 
     return "\n".join(linhas).strip(), "pedidos enviados"
+
+
+def calcular_total_pedido(pedido):
+    """Soma quantidade * preco_unitario dos itens. Não usa Produto.preco."""
+    total = Decimal("0")
+    itens = ItemPedido.objects.filter(pedido=pedido)
+    for item in itens:
+        total = total + (item.quantidade * item.preco_unitario)
+    return total
+
+
+def iniciar_finalizacao_whatsapp(cliente):
+    """
+    Localiza o pedido pendente mais recente do próprio cliente
+    e monta o pedido de confirmação. Não altera o banco.
+    """
+    pedido = (
+        Pedido.objects.filter(usuario=cliente, status="pendente")
+        .order_by("-data_pedido")
+        .first()
+    )
+    if not pedido or not ItemPedido.objects.filter(pedido=pedido).exists():
+        return (
+            "Você não possui pedido pendente para finalizar.",
+            "sem pedido pendente",
+            None,
+        )
+
+    total_texto = f"{calcular_total_pedido(pedido):.2f}".replace(".", ",")
+    texto = (
+        f"Pedido #{pedido.id}\n"
+        f"Total: R$ {total_texto}\n"
+        f"Status atual: {pedido.get_status_display()}\n"
+        "\n"
+        "Deseja finalizar este pedido para pagamento?\n"
+        "Responda SIM ou NÃO."
+    )
+    return texto, "aguardando finalização", pedido.id
+
+
+def interpretar_finalizacao_whatsapp(mensagem, pedido_id, cliente):
+    """
+    Interpreta SIM ou NÃO da finalização.
+    Altera somente o status, como a tela web.
+    Não baixa estoque nem cria movimentação.
+    """
+    mensagem = (mensagem or "").strip().lower()
+
+    if mensagem in ("nao", "não"):
+        return (
+            "Finalização cancelada. Seu pedido continua pendente.",
+            "finalização cancelada",
+            None,
+        )
+
+    if mensagem != "sim":
+        return (
+            "Resposta inválida. Responda SIM ou NÃO.",
+            "finalização inválida",
+            None,
+        )
+
+    pedido = Pedido.objects.filter(id=pedido_id, usuario=cliente).first()
+    if (
+        not pedido
+        or pedido.status != "pendente"
+        or not ItemPedido.objects.filter(pedido=pedido).exists()
+    ):
+        return (
+            "Este pedido não está mais disponível para finalização.",
+            "pedido indisponível para finalização",
+            None,
+        )
+
+    pedido.status = "aguardando_pagamento"
+    pedido.save(update_fields=["status"])
+
+    total_texto = f"{calcular_total_pedido(pedido):.2f}".replace(".", ",")
+    texto = (
+        f"Pedido #{pedido.id} finalizado com sucesso.\n"
+        "\n"
+        f"Status: {pedido.get_status_display()}\n"
+        f"Total: R$ {total_texto}\n"
+        "\n"
+        "Aguarde as instruções de pagamento."
+    )
+    return texto, "pedido aguardando pagamento", pedido.id
 
 
 def interpretar_selecao_produto_whatsapp(mensagem, ids_produtos):
@@ -1519,10 +1616,11 @@ def webhook_waha(request):
         if cliente:
             cliente_exibicao = cliente.nome
             mensagem_normalizada = mensagem.strip().lower()
-            # Novo catálogo cancela quantidade/confirmação e substitui a lista.
+            # Novo catálogo cancela quantidade/confirmação/finalização e substitui a lista.
             if mensagem_normalizada in COMANDOS_CATALOGO_WHATSAPP:
                 clientes_aguardando_quantidade.pop(telefone, None)
                 clientes_aguardando_confirmacao.pop(telefone, None)
+                clientes_aguardando_finalizacao.pop(telefone, None)
                 texto_resposta, acao_exibicao, ids_catalogo = (
                     montar_catalogo_whatsapp()
                 )
@@ -1581,8 +1679,34 @@ def webhook_waha(request):
                     clientes_aguardando_quantidade[telefone] = (
                         produto_id_selecionado
                     )
+            elif telefone in clientes_aguardando_finalizacao:
+                pedido_id_finalizacao = clientes_aguardando_finalizacao[telefone]
+                (
+                    texto_resposta,
+                    acao_exibicao,
+                    pedido_exibicao,
+                ) = interpretar_finalizacao_whatsapp(
+                    mensagem,
+                    pedido_id_finalizacao,
+                    cliente,
+                )
+                if acao_exibicao in (
+                    "finalização cancelada",
+                    "pedido aguardando pagamento",
+                    "pedido indisponível para finalização",
+                ):
+                    clientes_aguardando_finalizacao.pop(telefone, None)
             elif mensagem_normalizada in COMANDOS_PEDIDOS_WHATSAPP:
                 texto_resposta, acao_exibicao = montar_pedidos_whatsapp(cliente)
+            elif mensagem_normalizada in COMANDOS_FINALIZAR_WHATSAPP:
+                texto_resposta, acao_exibicao, pedido_id_finalizacao = (
+                    iniciar_finalizacao_whatsapp(cliente)
+                )
+                if pedido_id_finalizacao:
+                    clientes_aguardando_finalizacao[telefone] = (
+                        pedido_id_finalizacao
+                    )
+                pedido_exibicao = pedido_id_finalizacao
             else:
                 texto_resposta = (
                     f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
