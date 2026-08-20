@@ -586,49 +586,33 @@ def finalizar_pedido(request, pedido_id):
     return redirect("detalhe_pedido", pedido_id=pedido.id)
 
 
-@require_POST
-def confirmar_pagamento(request, pedido_id):
+def confirmar_pagamento_do_pedido(pedido_id):
     """
-    Confirma o pagamento: aguardando_pagamento -> pago.
+    Aplica a regra segura de pagamento: aguardando_pagamento -> pago.
     Trava Pedido e Produtos, relê status/estoque e aplica baixa,
     movimentações e status em uma única transação.
+    Retorna (True, None) se confirmou, ou (False, mensagem) se recusou.
+    Não verifica o dono do pedido; quem chama deve garantir isso.
     """
     with transaction.atomic():
         # Lock do Pedido: outra confirmação do mesmo pedido espera aqui.
-        pedido = get_object_or_404(
-            Pedido.objects.select_related("usuario").select_for_update(),
-            id=pedido_id,
-        )
+        pedido = Pedido.objects.select_for_update().get(id=pedido_id)
 
         # Status relido depois do lock (protege duplo clique).
         if pedido.status != "aguardando_pagamento":
-            return render(
-                request,
-                "estoque_app/detalhe_pedido.html",
-                montar_contexto_detalhe_pedido(
-                    pedido,
-                    "Este pedido não está aguardando pagamento.",
-                ),
-            )
+            return False, "Este pedido não está aguardando pagamento."
 
         itens = list(ItemPedido.objects.filter(pedido=pedido))
         if not itens:
-            return render(
-                request,
-                "estoque_app/detalhe_pedido.html",
-                montar_contexto_detalhe_pedido(
-                    pedido,
-                    "Não é possível confirmar pagamento de um pedido sem itens.",
-                ),
-            )
+            return False, "Não é possível confirmar pagamento de um pedido sem itens."
 
         # Mesmo produto em vários itens → uma única baixa consolidada.
         necessidade_por_produto = {}
         for item in itens:
-            produto_id = item.produto_id
-            if produto_id not in necessidade_por_produto:
-                necessidade_por_produto[produto_id] = 0
-            necessidade_por_produto[produto_id] += item.quantidade
+            id_produto = item.produto_id
+            if id_produto not in necessidade_por_produto:
+                necessidade_por_produto[id_produto] = 0
+            necessidade_por_produto[id_produto] += item.quantidade
 
         # Lock dos Produtos na mesma ordem (id) para reduzir deadlock.
         produtos_bloqueados = list(
@@ -641,22 +625,18 @@ def confirmar_pagamento(request, pedido_id):
             produtos_por_id[produto.id] = produto
 
         # Estoque relido depois do lock (protege a última unidade).
-        for produto_id, quantidade_total in necessidade_por_produto.items():
-            produto = produtos_por_id.get(produto_id)
+        for id_produto, quantidade_total in necessidade_por_produto.items():
+            produto = produtos_por_id.get(id_produto)
             if produto is None or quantidade_total > produto.estoque:
                 nome_produto = produto.nome if produto else "selecionado"
-                return render(
-                    request,
-                    "estoque_app/detalhe_pedido.html",
-                    montar_contexto_detalhe_pedido(
-                        pedido,
-                        f"Estoque insuficiente para o produto {nome_produto}.",
-                    ),
+                return (
+                    False,
+                    f"Estoque insuficiente para o produto {nome_produto}.",
                 )
 
         # Baixa UMA vez por produto, usando a soma total.
-        for produto_id, quantidade_total in necessidade_por_produto.items():
-            produto = produtos_por_id[produto_id]
+        for id_produto, quantidade_total in necessidade_por_produto.items():
+            produto = produtos_por_id[id_produto]
             produto.estoque = produto.estoque - quantidade_total
             produto.save(update_fields=["estoque"])
 
@@ -671,7 +651,28 @@ def confirmar_pagamento(request, pedido_id):
         pedido.status = "pago"
         pedido.save(update_fields=["status"])
 
-    return redirect("detalhe_pedido", pedido_id=pedido.id)
+    return True, None
+
+
+@require_POST
+def confirmar_pagamento(request, pedido_id):
+    """
+    View web: recebe o POST e mostra o detalhe do pedido.
+    A regra de estoque e status fica em confirmar_pagamento_do_pedido.
+    """
+    get_object_or_404(Pedido, id=pedido_id)
+    sucesso, mensagem = confirmar_pagamento_do_pedido(pedido_id)
+    if not sucesso:
+        pedido = get_object_or_404(
+            Pedido.objects.select_related("usuario"),
+            id=pedido_id,
+        )
+        return render(
+            request,
+            "estoque_app/detalhe_pedido.html",
+            montar_contexto_detalhe_pedido(pedido, mensagem),
+        )
+    return redirect("detalhe_pedido", pedido_id=pedido_id)
 
 
 @require_POST
