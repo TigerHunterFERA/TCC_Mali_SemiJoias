@@ -1249,9 +1249,18 @@ FRASES_PAGAMENTO_WHATSAPP = {
 }
 
 
+INTENCOES_WHATSAPP_PERMITIDAS = {
+    "consultar_catalogo",
+    "consultar_pedidos",
+    "iniciar_finalizacao",
+    "consultar_pagamento",
+    "desconhecida",
+}
+
+
 def interpretar_intencao_whatsapp(mensagem):
     """
-    Classifica frases naturais em uma intenção fechada.
+    Classifica frases naturais no contrato fechado {"intencao": ...}.
     Não acessa banco, não altera pedido/estoque e não chama WAHA.
     """
     texto = (mensagem or "").strip().lower()
@@ -1259,14 +1268,36 @@ def interpretar_intencao_whatsapp(mensagem):
         texto = texto[:-1].strip()
 
     if texto in FRASES_CATALOGO_WHATSAPP:
-        return "consultar_catalogo"
-    if texto in FRASES_PEDIDOS_WHATSAPP:
-        return "consultar_pedidos"
-    if texto in FRASES_FINALIZAR_WHATSAPP:
-        return "iniciar_finalizacao"
-    if texto in FRASES_PAGAMENTO_WHATSAPP:
-        return "consultar_pagamento"
-    return "desconhecida"
+        intencao = "consultar_catalogo"
+    elif texto in FRASES_PEDIDOS_WHATSAPP:
+        intencao = "consultar_pedidos"
+    elif texto in FRASES_FINALIZAR_WHATSAPP:
+        intencao = "iniciar_finalizacao"
+    elif texto in FRASES_PAGAMENTO_WHATSAPP:
+        intencao = "consultar_pagamento"
+    else:
+        intencao = "desconhecida"
+
+    return {"intencao": intencao}
+
+
+def validar_resultado_interpretacao_whatsapp(resultado):
+    """
+    Aceita só o contrato fechado: uma intenção permitida.
+    Formato inválido ou intenção fora da lista vira desconhecida.
+    Campos extras (pedido_id, acao etc.) são ignorados.
+    """
+    if not isinstance(resultado, dict):
+        return {"intencao": "desconhecida"}
+
+    intencao = resultado.get("intencao")
+    if not isinstance(intencao, str):
+        return {"intencao": "desconhecida"}
+
+    if intencao not in INTENCOES_WHATSAPP_PERMITIDAS:
+        return {"intencao": "desconhecida"}
+
+    return {"intencao": intencao}
 
 
 def montar_catalogo_whatsapp():
@@ -1816,7 +1847,9 @@ def webhook_waha(request):
                     montar_instrucoes_pagamento_whatsapp(cliente)
                 )
             else:
-                intencao = interpretar_intencao_whatsapp(mensagem)
+                resultado = interpretar_intencao_whatsapp(mensagem)
+                resultado = validar_resultado_interpretacao_whatsapp(resultado)
+                intencao = resultado["intencao"]
                 if intencao == "consultar_catalogo":
                     texto_resposta, acao_exibicao, ids_catalogo = (
                         montar_catalogo_whatsapp()
