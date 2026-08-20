@@ -590,83 +590,86 @@ def finalizar_pedido(request, pedido_id):
 def confirmar_pagamento(request, pedido_id):
     """
     Confirma o pagamento: aguardando_pagamento -> pago.
-    Valida estoque de todos os itens, baixa o estoque e registra saídas.
-    Tudo ou nada (transaction.atomic).
+    Trava Pedido e Produtos, relê status/estoque e aplica baixa,
+    movimentações e status em uma única transação.
     """
-    pedido = get_object_or_404(
-        Pedido.objects.select_related("usuario"),
-        id=pedido_id,
-    )
-
-    if pedido.status != "aguardando_pagamento":
-        return render(
-            request,
-            "estoque_app/detalhe_pedido.html",
-            montar_contexto_detalhe_pedido(
-                pedido,
-                "Este pedido não está aguardando pagamento.",
-            ),
+    with transaction.atomic():
+        # Lock do Pedido: outra confirmação do mesmo pedido espera aqui.
+        pedido = get_object_or_404(
+            Pedido.objects.select_related("usuario").select_for_update(),
+            id=pedido_id,
         )
 
-    itens = list(
-        ItemPedido.objects.filter(pedido=pedido).select_related("produto")
-    )
-
-    if not itens:
-        return render(
-            request,
-            "estoque_app/detalhe_pedido.html",
-            montar_contexto_detalhe_pedido(
-                pedido,
-                "Não é possível confirmar pagamento de um pedido sem itens.",
-            ),
-        )
-
-    # Agrupa a quantidade total necessária por produto
-    # (mesmo produto em vários itens do pedido → uma única baixa)
-    necessidade_por_produto = {}
-    for item in itens:
-        produto = item.produto
-        if produto.id not in necessidade_por_produto:
-            necessidade_por_produto[produto.id] = {
-                "produto": produto,
-                "quantidade": 0,
-            }
-        necessidade_por_produto[produto.id]["quantidade"] += item.quantidade
-
-    # Etapa 1: validar estoque de TODOS os produtos (sem alterar nada)
-    for dados in necessidade_por_produto.values():
-        produto = dados["produto"]
-        quantidade_total = dados["quantidade"]
-
-        if quantidade_total > produto.estoque:
+        # Status relido depois do lock (protege duplo clique).
+        if pedido.status != "aguardando_pagamento":
             return render(
                 request,
                 "estoque_app/detalhe_pedido.html",
                 montar_contexto_detalhe_pedido(
                     pedido,
-                    f"Estoque insuficiente para o produto {produto.nome}.",
+                    "Este pedido não está aguardando pagamento.",
                 ),
             )
 
-    # Etapa 2: aplicar alterações somente se a validação passou
-    with transaction.atomic():
-        # Baixa o estoque UMA vez por produto, usando a soma total
-        for dados in necessidade_por_produto.values():
-            produto = dados["produto"]
-            produto.estoque = produto.estoque - dados["quantidade"]
-            produto.save()
+        itens = list(ItemPedido.objects.filter(pedido=pedido))
+        if not itens:
+            return render(
+                request,
+                "estoque_app/detalhe_pedido.html",
+                montar_contexto_detalhe_pedido(
+                    pedido,
+                    "Não é possível confirmar pagamento de um pedido sem itens.",
+                ),
+            )
 
-        # Mantém uma movimentação de saída por ItemPedido
+        # Mesmo produto em vários itens → uma única baixa consolidada.
+        necessidade_por_produto = {}
+        for item in itens:
+            produto_id = item.produto_id
+            if produto_id not in necessidade_por_produto:
+                necessidade_por_produto[produto_id] = 0
+            necessidade_por_produto[produto_id] += item.quantidade
+
+        # Lock dos Produtos na mesma ordem (id) para reduzir deadlock.
+        produtos_bloqueados = list(
+            Produto.objects.select_for_update()
+            .filter(id__in=necessidade_por_produto.keys())
+            .order_by("id")
+        )
+        produtos_por_id = {}
+        for produto in produtos_bloqueados:
+            produtos_por_id[produto.id] = produto
+
+        # Estoque relido depois do lock (protege a última unidade).
+        for produto_id, quantidade_total in necessidade_por_produto.items():
+            produto = produtos_por_id.get(produto_id)
+            if produto is None or quantidade_total > produto.estoque:
+                nome_produto = produto.nome if produto else "selecionado"
+                return render(
+                    request,
+                    "estoque_app/detalhe_pedido.html",
+                    montar_contexto_detalhe_pedido(
+                        pedido,
+                        f"Estoque insuficiente para o produto {nome_produto}.",
+                    ),
+                )
+
+        # Baixa UMA vez por produto, usando a soma total.
+        for produto_id, quantidade_total in necessidade_por_produto.items():
+            produto = produtos_por_id[produto_id]
+            produto.estoque = produto.estoque - quantidade_total
+            produto.save(update_fields=["estoque"])
+
+        # Mantém uma movimentação de saída por ItemPedido.
         for item in itens:
             MovimentacaoEstoque.objects.create(
-                produto=item.produto,
+                produto=produtos_por_id[item.produto_id],
                 tipo=MovimentacaoEstoque.TIPO_SAIDA,
                 quantidade=item.quantidade,
             )
 
         pedido.status = "pago"
-        pedido.save()
+        pedido.save(update_fields=["status"])
 
     return redirect("detalhe_pedido", pedido_id=pedido.id)
 
