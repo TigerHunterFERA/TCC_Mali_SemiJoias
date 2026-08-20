@@ -1210,6 +1210,64 @@ COMANDOS_PAGAMENTO_WHATSAPP = {
     "pix",
 }
 
+# Frases naturais curtas (Aula 20.2). Não substituem os comandos exatos.
+FRASES_CATALOGO_WHATSAPP = {
+    "quero ver os produtos",
+    "quero ver as peças",
+    "quero ver as pecas",
+    "quais produtos vocês têm",
+    "quais produtos voces tem",
+    "o que vocês têm disponível",
+    "o que voces tem disponivel",
+    "me mostre o catálogo",
+    "me mostre o catalogo",
+}
+
+FRASES_PEDIDOS_WHATSAPP = {
+    "quero ver meus pedidos",
+    "quais são meus pedidos",
+    "quais sao meus pedidos",
+    "tenho algum pedido",
+    "como está meu pedido",
+    "como esta meu pedido",
+}
+
+FRASES_FINALIZAR_WHATSAPP = {
+    "quero finalizar meu pedido",
+    "quero finalizar minha compra",
+    "pode finalizar meu pedido",
+    "quero fechar meu pedido",
+}
+
+FRASES_PAGAMENTO_WHATSAPP = {
+    "como faço para pagar",
+    "como faco para pagar",
+    "qual a chave pix",
+    "qual é a chave pix",
+    "qual e a chave pix",
+    "quero pagar meu pedido",
+}
+
+
+def interpretar_intencao_whatsapp(mensagem):
+    """
+    Classifica frases naturais em uma intenção fechada.
+    Não acessa banco, não altera pedido/estoque e não chama WAHA.
+    """
+    texto = (mensagem or "").strip().lower()
+    if texto.endswith("?"):
+        texto = texto[:-1].strip()
+
+    if texto in FRASES_CATALOGO_WHATSAPP:
+        return "consultar_catalogo"
+    if texto in FRASES_PEDIDOS_WHATSAPP:
+        return "consultar_pedidos"
+    if texto in FRASES_FINALIZAR_WHATSAPP:
+        return "iniciar_finalizacao"
+    if texto in FRASES_PAGAMENTO_WHATSAPP:
+        return "consultar_pagamento"
+    return "desconhecida"
+
 
 def montar_catalogo_whatsapp():
     """
@@ -1758,9 +1816,36 @@ def webhook_waha(request):
                     montar_instrucoes_pagamento_whatsapp(cliente)
                 )
             else:
-                texto_resposta = (
-                    f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
-                )
+                intencao = interpretar_intencao_whatsapp(mensagem)
+                if intencao == "consultar_catalogo":
+                    texto_resposta, acao_exibicao, ids_catalogo = (
+                        montar_catalogo_whatsapp()
+                    )
+                    if ids_catalogo:
+                        clientes_aguardando_produto[telefone] = ids_catalogo
+                    else:
+                        clientes_aguardando_produto.pop(telefone, None)
+                elif intencao == "consultar_pedidos":
+                    texto_resposta, acao_exibicao = montar_pedidos_whatsapp(
+                        cliente
+                    )
+                elif intencao == "iniciar_finalizacao":
+                    texto_resposta, acao_exibicao, pedido_id_finalizacao = (
+                        iniciar_finalizacao_whatsapp(cliente)
+                    )
+                    if pedido_id_finalizacao:
+                        clientes_aguardando_finalizacao[telefone] = (
+                            pedido_id_finalizacao
+                        )
+                    pedido_exibicao = pedido_id_finalizacao
+                elif intencao == "consultar_pagamento":
+                    texto_resposta, acao_exibicao, pedido_exibicao = (
+                        montar_instrucoes_pagamento_whatsapp(cliente)
+                    )
+                else:
+                    texto_resposta = (
+                        f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
+                    )
         elif telefone in telefones_aguardando_nome:
             nome_informado = mensagem.strip()
             if not validar_nome_whatsapp(nome_informado):
