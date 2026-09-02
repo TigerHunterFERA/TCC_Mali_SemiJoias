@@ -151,3 +151,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 WAHA_API_URL = os.getenv("WAHA_API_URL", "http://localhost:3000")
 WAHA_API_KEY = os.getenv("WAHA_API_KEY", "")
 WAHA_SESSION = os.getenv("WAHA_SESSION", "default")
+
+# Integração mínima com a AbacatePay (Bloco 21.3).
+# A API Key e o webhook secret vêm de variáveis de ambiente; não ficam no código.
+ABACATEPAY_API_KEY = os.getenv("ABACATEPAY_API_KEY", "")
+ABACATEPAY_WEBHOOK_SECRET = os.getenv("ABACATEPAY_WEBHOOK_SECRET", "")
+ABACATEPAY_API_URL = os.getenv(
+    "ABACATEPAY_API_URL",
+    "https://api.abacatepay.com",
+)

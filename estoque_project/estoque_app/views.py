@@ -84,10 +84,11 @@ from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.conf import settings
 from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido, Usuario
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 # from django.shortcuts import render, redirect
 import json
 import requests
+import secrets
 from urllib.parse import quote
 
 #def validar_produto(request):
@@ -1109,6 +1110,13 @@ clientes_aguardando_confirmacao = {}
 # Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
 clientes_aguardando_finalizacao = {}
 
+# Estado temporário em memória (Bloco 21.3 — somente desenvolvimento).
+# telefone -> cobrança PIX AbacatePay do pedido aguardando pagamento.
+# Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
+# O webhook NÃO usa este dicionário para descobrir o Pedido pago:
+# ele usa externalId no formato pedido-<id>.
+cobrancas_abacatepay_whatsapp = {}
+
 
 def validar_nome_whatsapp(nome):
     """
@@ -1209,6 +1217,9 @@ COMANDOS_PAGAMENTO_WHATSAPP = {
     "pagar",
     "pix",
 }
+
+# Comando explícito de Sandbox/Dev Mode. Não passa pela IA.
+COMANDO_SIMULAR_PAGAMENTO_WHATSAPP = "simular pagamento"
 
 # Frases naturais curtas (Aula 20.2). Não substituem os comandos exatos.
 FRASES_CATALOGO_WHATSAPP = {
@@ -1379,6 +1390,294 @@ def calcular_total_pedido(pedido):
     return total
 
 
+def converter_reais_para_centavos(valor):
+    """
+    Converte Decimal em reais para inteiro em centavos.
+    Não usa float. Valor <= 0 devolve None.
+    """
+    if valor is None:
+        return None
+    if not isinstance(valor, Decimal):
+        try:
+            valor = Decimal(str(valor))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
+    if valor <= 0:
+        return None
+    centavos = (valor * Decimal("100")).quantize(
+        Decimal("1"),
+        rounding=ROUND_HALF_UP,
+    )
+    return int(centavos)
+
+
+def montar_resultado_pix_falha(mensagem_erro=None):
+    return {
+        "sucesso": False,
+        "charge_id": None,
+        "br_code": None,
+        "dev_mode": None,
+        "status": None,
+        "expires_at": None,
+        "erro": mensagem_erro or "Não foi possível gerar o pagamento PIX agora.",
+    }
+
+
+def criar_cobranca_pix_abacatepay(pedido):
+    """
+    Cria cobrança PIX na AbacatePay para um Pedido aguardando pagamento.
+    Não altera status, estoque nem movimentação.
+    """
+    if pedido is None or pedido.status != "aguardando_pagamento":
+        return montar_resultado_pix_falha()
+
+    chave = (settings.ABACATEPAY_API_KEY or "").strip()
+    if not chave:
+        print("=== ABACATEPAY PIX ===")
+        print(f"Pedido: {pedido.id}")
+        print("Cobrança criada: não")
+        print("======================")
+        return montar_resultado_pix_falha()
+
+    centavos = converter_reais_para_centavos(calcular_total_pedido(pedido))
+    if centavos is None:
+        print("=== ABACATEPAY PIX ===")
+        print(f"Pedido: {pedido.id}")
+        print("Cobrança criada: não")
+        print("======================")
+        return montar_resultado_pix_falha()
+
+    url = settings.ABACATEPAY_API_URL.rstrip("/") + "/v2/transparents/create"
+    cabecalhos = {
+        "Authorization": "Bearer " + chave,
+        "Content-Type": "application/json",
+    }
+    corpo = {
+        "method": "PIX",
+        "data": {
+            "amount": centavos,
+            "expiresIn": 3600,
+            "description": f"Pedido #{pedido.id} - Mali Semijoias",
+            "externalId": f"pedido-{pedido.id}",
+            "metadata": {
+                "pedido_id": pedido.id,
+            },
+        },
+    }
+
+    try:
+        resposta = requests.post(
+            url,
+            json=corpo,
+            headers=cabecalhos,
+            timeout=15,
+        )
+    except requests.exceptions.RequestException:
+        print("=== ABACATEPAY PIX ===")
+        print(f"Pedido: {pedido.id}")
+        print("Cobrança criada: não")
+        print("======================")
+        return montar_resultado_pix_falha()
+
+    if resposta.status_code not in (200, 201):
+        print("=== ABACATEPAY PIX ===")
+        print(f"Pedido: {pedido.id}")
+        print("Cobrança criada: não")
+        print("======================")
+        return montar_resultado_pix_falha()
+
+    try:
+        dados = resposta.json()
+    except ValueError:
+        print("=== ABACATEPAY PIX ===")
+        print(f"Pedido: {pedido.id}")
+        print("Cobrança criada: não")
+        print("======================")
+        return montar_resultado_pix_falha()
+
+    if not isinstance(dados, dict):
+        print("=== ABACATEPAY PIX ===")
+        print(f"Pedido: {pedido.id}")
+        print("Cobrança criada: não")
+        print("======================")
+        return montar_resultado_pix_falha()
+
+    dados_cobranca = dados.get("data")
+    if not isinstance(dados_cobranca, dict):
+        print("=== ABACATEPAY PIX ===")
+        print(f"Pedido: {pedido.id}")
+        print("Cobrança criada: não")
+        print("======================")
+        return montar_resultado_pix_falha()
+
+    charge_id = dados_cobranca.get("id")
+    br_code = dados_cobranca.get("brCode")
+    if not charge_id or not br_code:
+        print("=== ABACATEPAY PIX ===")
+        print(f"Pedido: {pedido.id}")
+        print("Cobrança criada: não")
+        print("======================")
+        return montar_resultado_pix_falha()
+
+    status_cobranca = dados_cobranca.get("status")
+    dev_mode = dados_cobranca.get("devMode")
+    print("=== ABACATEPAY PIX ===")
+    print(f"Pedido: {pedido.id}")
+    print(f"Status: {status_cobranca}")
+    print(f"Dev mode: {dev_mode}")
+    print("Cobrança criada: sim")
+    print("======================")
+
+    return {
+        "sucesso": True,
+        "charge_id": charge_id,
+        "br_code": br_code,
+        "dev_mode": bool(dev_mode),
+        "status": status_cobranca,
+        "expires_at": dados_cobranca.get("expiresAt"),
+        "erro": None,
+    }
+
+
+def obter_cobranca_temporaria_whatsapp(telefone, pedido_id):
+    """Devolve a cobrança em memória só se for do mesmo pedido e tiver PIX."""
+    cobranca = cobrancas_abacatepay_whatsapp.get(telefone)
+    if not cobranca:
+        return None
+    if cobranca.get("pedido_id") != pedido_id:
+        return None
+    if not cobranca.get("charge_id") or not cobranca.get("br_code"):
+        return None
+    return cobranca
+
+
+def guardar_cobranca_temporaria_whatsapp(telefone, pedido_id, resultado):
+    """Guarda a cobrança só para reexibir o PIX e para o comando de simulação."""
+    if not telefone or not resultado or not resultado.get("sucesso"):
+        return
+    cobrancas_abacatepay_whatsapp[telefone] = {
+        "pedido_id": pedido_id,
+        "charge_id": resultado["charge_id"],
+        "br_code": resultado["br_code"],
+        "dev_mode": bool(resultado.get("dev_mode")),
+    }
+
+
+def limpar_cobranca_temporaria_whatsapp(telefone, pedido_id):
+    cobranca = cobrancas_abacatepay_whatsapp.get(telefone)
+    if cobranca and cobranca.get("pedido_id") == pedido_id:
+        cobrancas_abacatepay_whatsapp.pop(telefone, None)
+
+
+def montar_bloco_pix_whatsapp(pedido, br_code, dev_mode, titulo=None):
+    """Monta o texto do PIX para o WhatsApp. Não baixa estoque."""
+    total_texto = f"{calcular_total_pedido(pedido):.2f}".replace(".", ",")
+    linhas = []
+    if titulo:
+        linhas.append(titulo)
+        linhas.append("")
+    linhas.extend(
+        [
+            f"Pedido #{pedido.id}",
+            f"Status: {pedido.get_status_display()}",
+            f"Total: R$ {total_texto}",
+            "",
+            "Pagamento via PIX",
+            "",
+            "PIX copia e cola:",
+            "",
+            br_code,
+            "",
+            "Após o pagamento, a confirmação será automática.",
+        ]
+    )
+    if dev_mode:
+        linhas.extend(
+            [
+                "",
+                "Ambiente de desenvolvimento.",
+                'Envie "simular pagamento" para simular a quitação.',
+            ]
+        )
+    return "\n".join(linhas)
+
+
+def simular_pagamento_abacatepay(charge_id):
+    """
+    Pede à AbacatePay para simular o pagamento no Dev Mode.
+    Não confirma o Pedido e não altera estoque.
+    """
+    chave = (settings.ABACATEPAY_API_KEY or "").strip()
+    if not chave or not charge_id:
+        return False, "Não foi possível simular o pagamento agora."
+
+    url = (
+        settings.ABACATEPAY_API_URL.rstrip("/")
+        + "/v2/transparents/simulate-payment"
+    )
+    cabecalhos = {
+        "Authorization": "Bearer " + chave,
+    }
+
+    try:
+        resposta = requests.post(
+            url,
+            params={"id": charge_id},
+            headers=cabecalhos,
+            timeout=15,
+        )
+    except requests.exceptions.RequestException:
+        return False, "Não foi possível simular o pagamento agora."
+
+    if resposta.status_code not in (200, 201):
+        return False, "Não foi possível simular o pagamento agora."
+
+    return True, "Simulação enviada. Aguarde a confirmação automática."
+
+
+def interpretar_simulacao_pagamento_whatsapp(telefone):
+    """
+    Comando Dev Mode: simular pagamento.
+    Só chama a API da AbacatePay. Não chama confirmar_pagamento_do_pedido.
+    """
+    cobranca = cobrancas_abacatepay_whatsapp.get(telefone)
+    if not cobranca or not cobranca.get("charge_id"):
+        return (
+            "Não encontrei uma cobrança em aberto para simular.",
+            "simulação indisponível",
+        )
+
+    if cobranca.get("dev_mode") is not True:
+        return (
+            "Esta operação está disponível somente no ambiente de desenvolvimento.",
+            "simulação fora de dev",
+        )
+
+    sucesso, texto = simular_pagamento_abacatepay(cobranca["charge_id"])
+    if sucesso:
+        return texto, "simulação enviada"
+    return texto, "erro na simulação"
+
+
+def extrair_pedido_id_do_external_id(external_id):
+    """Aceita somente o formato exato pedido-<numero>."""
+    texto = str(external_id or "").strip()
+    prefixo = "pedido-"
+    if not texto.startswith(prefixo):
+        return None
+    resto = texto[len(prefixo):]
+    if not resto.isdigit():
+        return None
+    return int(resto)
+
+
+def valores_em_centavos_iguais(valor_api, esperado):
+    try:
+        return int(valor_api) == int(esperado)
+    except (TypeError, ValueError):
+        return False
+
+
 def iniciar_finalizacao_whatsapp(cliente):
     """
     Localiza o pedido pendente mais recente do próprio cliente
@@ -1413,6 +1712,7 @@ def interpretar_finalizacao_whatsapp(mensagem, pedido_id, cliente):
     Interpreta SIM ou NÃO da finalização.
     Altera somente o status, como a tela web.
     Não baixa estoque nem cria movimentação.
+    Depois do SIM, tenta gerar o PIX na AbacatePay.
     """
     mensagem = (mensagem or "").strip().lower()
 
@@ -1445,6 +1745,21 @@ def interpretar_finalizacao_whatsapp(mensagem, pedido_id, cliente):
     pedido.status = "aguardando_pagamento"
     pedido.save(update_fields=["status"])
 
+    resultado = criar_cobranca_pix_abacatepay(pedido)
+    if resultado["sucesso"]:
+        guardar_cobranca_temporaria_whatsapp(
+            cliente.telefone,
+            pedido.id,
+            resultado,
+        )
+        texto = montar_bloco_pix_whatsapp(
+            pedido,
+            resultado["br_code"],
+            resultado["dev_mode"],
+            titulo=f"Pedido #{pedido.id} finalizado com sucesso.",
+        )
+        return texto, "pedido aguardando pagamento", pedido.id
+
     total_texto = f"{calcular_total_pedido(pedido):.2f}".replace(".", ",")
     texto = (
         f"Pedido #{pedido.id} finalizado com sucesso.\n"
@@ -1452,16 +1767,17 @@ def interpretar_finalizacao_whatsapp(mensagem, pedido_id, cliente):
         f"Status: {pedido.get_status_display()}\n"
         f"Total: R$ {total_texto}\n"
         "\n"
-        "Aguarde as instruções de pagamento."
+        "Não foi possível gerar o pagamento PIX agora.\n"
+        'Tente enviar "pix" em alguns instantes.'
     )
     return texto, "pedido aguardando pagamento", pedido.id
 
 
 def montar_instrucoes_pagamento_whatsapp(cliente):
     """
-    Envia instruções de Pix do pedido aguardando pagamento mais recente.
-    Somente leitura: não altera status, estoque nem movimentação.
-    A chave Pix ainda não existe no projeto — placeholder para configuração futura.
+    Envia o PIX do pedido aguardando pagamento mais recente.
+    Reaproveita a cobrança em memória quando ainda é do mesmo pedido.
+    Não altera status, estoque nem movimentação.
     """
     pedido = (
         Pedido.objects.filter(
@@ -1478,17 +1794,32 @@ def montar_instrucoes_pagamento_whatsapp(cliente):
             None,
         )
 
-    total_texto = f"{calcular_total_pedido(pedido):.2f}".replace(".", ",")
-    texto = (
-        f"Pedido #{pedido.id}\n"
-        f"Total: R$ {total_texto}\n"
-        f"Status: {pedido.get_status_display()}\n"
-        "\n"
-        "Forma de pagamento: Pix\n"
-        "\n"
-        "Chave Pix: CONFIGURAR_CHAVE_PIX\n"
-        "\n"
-        "Após realizar o pagamento, aguarde a confirmação da loja."
+    cobranca = obter_cobranca_temporaria_whatsapp(cliente.telefone, pedido.id)
+    if cobranca:
+        texto = montar_bloco_pix_whatsapp(
+            pedido,
+            cobranca["br_code"],
+            cobranca.get("dev_mode"),
+        )
+        return texto, "instruções de pagamento enviadas", pedido.id
+
+    resultado = criar_cobranca_pix_abacatepay(pedido)
+    if not resultado["sucesso"]:
+        return (
+            "Não foi possível gerar o pagamento PIX agora. Tente novamente em alguns instantes.",
+            "pagamento não gerado",
+            pedido.id,
+        )
+
+    guardar_cobranca_temporaria_whatsapp(
+        cliente.telefone,
+        pedido.id,
+        resultado,
+    )
+    texto = montar_bloco_pix_whatsapp(
+        pedido,
+        resultado["br_code"],
+        resultado["dev_mode"],
     )
     return texto, "instruções de pagamento enviadas", pedido.id
 
@@ -1846,6 +2177,10 @@ def webhook_waha(request):
                 texto_resposta, acao_exibicao, pedido_exibicao = (
                     montar_instrucoes_pagamento_whatsapp(cliente)
                 )
+            elif mensagem_normalizada == COMANDO_SIMULAR_PAGAMENTO_WHATSAPP:
+                texto_resposta, acao_exibicao = (
+                    interpretar_simulacao_pagamento_whatsapp(telefone)
+                )
             else:
                 resultado = interpretar_intencao_whatsapp(mensagem)
                 resultado = validar_resultado_interpretacao_whatsapp(resultado)
@@ -1940,3 +2275,191 @@ def webhook_waha(request):
     print("=================================")
 
     return JsonResponse({"status": "ok"}, status=200)
+
+
+def secret_webhook_abacatepay_valido(request):
+    """
+    Bloco DEV/local: autenticação por webhookSecret na query string.
+    Em produção pública, complementar com HMAC conforme a documentação da AbacatePay.
+    """
+    secret_esperado = settings.ABACATEPAY_WEBHOOK_SECRET or ""
+    secret_recebido = request.GET.get("webhookSecret") or ""
+    if not secret_esperado:
+        return False
+    try:
+        return secrets.compare_digest(secret_recebido, secret_esperado)
+    except (TypeError, ValueError):
+        return False
+
+
+@csrf_exempt
+@require_POST
+def webhook_abacatepay(request):
+    """
+    Receptor da AbacatePay.
+    Confirma o Pedido somente com confirmar_pagamento_do_pedido.
+    Não baixa estoque por conta própria.
+    """
+    if not secret_webhook_abacatepay_valido(request):
+        return JsonResponse(
+            {"status": "erro", "mensagem": "Não autorizado."},
+            status=401,
+        )
+
+    try:
+        dados = json.loads(request.body)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return JsonResponse(
+            {"status": "erro", "mensagem": "JSON inválido."},
+            status=400,
+        )
+
+    if not isinstance(dados, dict):
+        return JsonResponse(
+            {"status": "erro", "mensagem": "JSON inválido."},
+            status=400,
+        )
+
+    evento = dados.get("event") or dados.get("type")
+    if evento != "transparent.completed":
+        return JsonResponse({"status": "ok", "mensagem": "Evento ignorado."})
+
+    payload = dados.get("data") or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    transparent = payload.get("transparent")
+    if not isinstance(transparent, dict):
+        print("=== PAGAMENTO ABACATEPAY ===")
+        print(f"Evento: {evento}")
+        print("Pagamento processado: não")
+        print("===========================")
+        return JsonResponse(
+            {"status": "erro", "mensagem": "Payload inválido."},
+            status=400,
+        )
+
+    status_pagamento = transparent.get("status")
+    print("=== PAGAMENTO ABACATEPAY ===")
+    print(f"Evento: {evento}")
+    print(f"Status: {status_pagamento}")
+
+    if status_pagamento != "PAID":
+        print("Pagamento processado: não")
+        print("===========================")
+        return JsonResponse(
+            {"status": "erro", "mensagem": "Pagamento não está PAID."},
+            status=400,
+        )
+
+    pedido_id = extrair_pedido_id_do_external_id(transparent.get("externalId"))
+    if pedido_id is None:
+        print("Pagamento processado: não")
+        print("===========================")
+        return JsonResponse(
+            {"status": "erro", "mensagem": "externalId inválido."},
+            status=400,
+        )
+
+    print(f"Pedido: {pedido_id}")
+
+    pedido = (
+        Pedido.objects.select_related("usuario")
+        .filter(id=pedido_id)
+        .first()
+    )
+    if pedido is None:
+        print("Pagamento processado: não")
+        print("===========================")
+        return JsonResponse(
+            {"status": "erro", "mensagem": "Pedido não encontrado."},
+            status=404,
+        )
+
+    if pedido.status == "pago":
+        print("Pagamento processado: já processado")
+        print("===========================")
+        return JsonResponse(
+            {"status": "ok", "mensagem": "Evento já processado."}
+        )
+
+    if pedido.status != "aguardando_pagamento":
+        print("Pagamento processado: não")
+        print("===========================")
+        return JsonResponse(
+            {"status": "erro", "mensagem": "Pedido não está aguardando pagamento."},
+            status=400,
+        )
+
+    esperado_centavos = converter_reais_para_centavos(
+        calcular_total_pedido(pedido)
+    )
+    paid_amount = transparent.get("paidAmount")
+    amount = transparent.get("amount")
+    dev_mode = (
+        transparent.get("devMode") is True
+        or dados.get("devMode") is True
+    )
+
+    # amount sempre precisa bater com o total do Pedido.
+    if esperado_centavos is None or not valores_em_centavos_iguais(
+        amount,
+        esperado_centavos,
+    ):
+        print("Pagamento processado: não")
+        print("===========================")
+        return JsonResponse(
+            {"status": "erro", "mensagem": "Valor pago diferente do pedido."},
+            status=400,
+        )
+
+    # Sandbox real pode enviar paidAmount=null. Só aceitamos isso em Dev Mode.
+    if paid_amount is None:
+        if not dev_mode:
+            print("Pagamento processado: não")
+            print("===========================")
+            return JsonResponse(
+                {"status": "erro", "mensagem": "Valor pago diferente do pedido."},
+                status=400,
+            )
+    elif not valores_em_centavos_iguais(paid_amount, esperado_centavos):
+        print("Pagamento processado: não")
+        print("===========================")
+        return JsonResponse(
+            {"status": "erro", "mensagem": "Valor pago diferente do pedido."},
+            status=400,
+        )
+
+    sucesso, _mensagem = confirmar_pagamento_do_pedido(pedido.id)
+    if not sucesso:
+        pedido.refresh_from_db(fields=["status"])
+        if pedido.status == "pago":
+            print("Pagamento processado: já processado")
+            print("===========================")
+            return JsonResponse(
+                {"status": "ok", "mensagem": "Evento já processado."}
+            )
+        print("Pagamento processado: não")
+        print("===========================")
+        return JsonResponse(
+            {"status": "erro", "mensagem": "Pagamento não confirmado."},
+            status=409,
+        )
+
+    print("Pagamento processado: sim")
+    print("===========================")
+
+    telefone = pedido.usuario.telefone
+    if telefone:
+        texto = (
+            "✅ Pagamento confirmado!\n"
+            "\n"
+            f"Pedido #{pedido.id} pago com sucesso.\n"
+            "\n"
+            "Seu pagamento foi identificado automaticamente.\n"
+            "\n"
+            "Obrigado pela compra!"
+        )
+        enviar_mensagem_waha(telefone, texto)
+        limpar_cobranca_temporaria_whatsapp(telefone, pedido.id)
+
+    return JsonResponse({"status": "ok", "mensagem": "Pagamento confirmado."})
