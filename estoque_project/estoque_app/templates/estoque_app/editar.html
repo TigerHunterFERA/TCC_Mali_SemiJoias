@@ -1,65 +1,19 @@
-<!-- <!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Mali Semijoias - Estoque</title>
-    {% load static %}
-    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
-</head>
-<body>
-<h1>Editar Produto</h1>
-<form method="POST" class="form-container">
-    {% csrf_token %}
-    <label for="nome">Nome:</label>
-    <input type="text" id="nome" name="nome" value="{{ produto.nome }}" required>
+{% extends "estoque_app/base.html" %}
 
-    <label for="quantidade">Quantidade:</label>
-    <input type="number" id="quantidade" name="quantidade" value="{{ produto.quantidade }}" required>
+{% block title %}Editar Produto{% endblock %}
 
-    <label for="preco">Preço:</label>
-    <input type="number" id="preco" name="preco" value="{{ produto.preco }}" required>
-
-    <label for="imagem">Imagem:</label>
-    <input type="url" id="imagem" name="imagem" value="{{ produto.imagem }}" placeholder="https://...">
-
-    <label for="descricao">Descriçao:</label>
-    <input type="text" id="descricao" name="descricao" value="{{ produto.descricao }}" required>
-
-    <button type="submit">Atualizar</button>
-</form>
-{% if mensagem %}<p class="erro">{{ mensagem }}</p>{% endif %}
-</body>
-</html> -->
-
-{% load static %}
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Editar Produto</title>
-    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
-</head>
-<body>
-    <!-- Sidebar fixa -->
-    <nav class="sidebar">
-        <h2>MALI</h2>
-        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
-        <a href="{% url 'produtos' %}">💍 Estoque</a>
-    </nav>
-
-    <!-- Área principal -->
-    <main class="main-content">
-        <header>
-            <h1>Editar Produto</h1>
+{% block content %}
+        <header class="page-header">
+            <div class="page-header-text">
+                <h1>Editar Produto</h1>
+                <p class="page-subtitle">Atualize os dados do item sem alterar o estoque nesta tela</p>
+            </div>
         </header>
 
         {% if erro %}
-            <p style="color: red; font-weight: bold;">
-                {{ erro }}
-            </p>
+            <p class="alerta-erro">{{ erro }}</p>
         {% endif %}
 
-        <!-- Card estilizado -->
         <div class="card">
             <form method="POST" class="form-container editar-produto-form">
                 {% csrf_token %}
@@ -120,7 +74,6 @@
                     <input type="number" step="0.01" min="0" name="preco" value="{{ produto.preco }}" required>
                 </div>
 
-                <!-- Bloco 1: estoque somente leitura + movimentação -->
                 <div class="estoque-edicao">
                     <div class="form-group">
                         <label>Estoque atual</label>
@@ -135,21 +88,19 @@
                         Para alterar o estoque, utilize a opção "Movimentar estoque".
                     </p>
 
-                    <a href="{% url 'movimentar' produto.id %}" class="btn-mali estoque-edicao-movimentar">
-                        📦 Movimentar estoque
+                    <a href="{% url 'movimentar' produto.id %}" class="btn-secondary estoque-edicao-movimentar">
+                        Movimentar estoque
                     </a>
                 </div>
 
-                <!-- Bloco 2: descrição -->
                 <div class="form-group estoque-edicao-descricao">
                     <label>Descrição</label>
                     <textarea name="descricao">{{ produto.descricao }}</textarea>
                 </div>
 
-                <!-- Bloco 3: ações finais -->
                 <div class="form-actions estoque-edicao-botoes">
-                    <button type="submit" class="btn-mali">Salvar Alterações</button>
-                    <a href="{% url 'produtos' %}" class="btn-mali estoque-edicao-cancelar">Cancelar</a>
+                    <button type="submit" class="btn-primary">Salvar Alterações</button>
+                    <a href="{% url 'produtos' %}" class="btn-secondary estoque-edicao-cancelar">Cancelar</a>
                 </div>
             </form>
 
@@ -157,12 +108,14 @@
                 <p class="erro">{{ mensagem }}</p>
             {% endif %}
         </div>
-    </main>
+{% endblock %}
+
+{% block extra_js %}
     <script>
         const banhoSelect = document.getElementById("banho-select");
         const novoBanhoContainer = document.getElementById("novo-banho-container");
         const novoBanhoInput = document.getElementById("novo-banho-input");
-    
+
         banhoSelect.addEventListener("change", function () {
             if (this.value === "__novo__") {
                 novoBanhoContainer.style.display = "block";
@@ -175,5 +128,4 @@
             }
         });
     </script>
-</body>
-</html>
+{% endblock %}

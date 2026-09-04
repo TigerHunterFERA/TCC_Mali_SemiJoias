@@ -1,73 +1,58 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Mali Semijoias - Pedido #{{ pedido.id }}</title>
-    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
-</head>
-<body>
-    <nav class="sidebar">
-        <h2>MALI</h2>
-        <a href="{% url 'pagina_inicial' %}">🏠 Página Inicial</a>
-        <a href="{% url 'dashboard' %}">📊 Dashboard</a>
-        <a href="{% url 'produtos' %}">💍 Estoque</a>
-        <a href="{% url 'movimentacoes' %}">📦 Movimentações</a>
-        <a href="{% url 'pedidos' %}">🧾 Pedidos</a>
-    </nav>
+{% extends "estoque_app/base.html" %}
 
-    <main class="main-content">
-        <header class="page-header" style="display:flex; align-items:center; justify-content:space-between; gap: 16px;">
-            <div>
+{% block title %}Mali Semijoias - Pedido #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+        <header class="page-header">
+            <div class="page-header-text">
                 <h1>Pedido #{{ pedido.id }}</h1>
-                <p style="margin-top:6px; color:#6f6f6f;">Detalhes do pedido</p>
+                <p class="page-subtitle">Detalhes do pedido</p>
             </div>
-            <div style="display:flex; gap:10px; align-items:center;">
-                <a href="{% url 'pagina_inicial' %}" class="btn-mali" style="background:#ccc; color:#333;">Página Inicial</a>
+            <div class="page-header-actions">
                 {% if pedido.status == "pendente" %}
-                    <a href="{% url 'adicionar_item_pedido' pedido.id %}" class="btn-mali">+ Adicionar item</a>
-                    <form method="POST" action="{% url 'finalizar_pedido' pedido.id %}" style="display:inline; margin:0;">
+                    <a href="{% url 'adicionar_item_pedido' pedido.id %}" class="btn-primary">+ Adicionar item</a>
+                    <form method="POST" action="{% url 'finalizar_pedido' pedido.id %}" class="form-inline">
                         {% csrf_token %}
-                        <button type="submit" class="btn-mali">Finalizar pedido</button>
-                    </form>
-                {% endif %}
-                {% if pedido.status == "aguardando_pagamento" %}
-                    <form method="POST" action="{% url 'confirmar_pagamento' pedido.id %}" style="display:inline; margin:0;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn-mali">Confirmar pagamento</button>
+                        <button type="submit" class="btn-primary">Finalizar pedido</button>
                     </form>
                 {% endif %}
                 {% if pedido.status == "pendente" or pedido.status == "aguardando_pagamento" %}
-                    <form method="POST" action="{% url 'cancelar_pedido' pedido.id %}" style="display:inline; margin:0;" onsubmit="return confirm('Deseja cancelar este pedido?');">
+                    <form method="POST" action="{% url 'cancelar_pedido' pedido.id %}" class="form-inline" onsubmit="return confirm('Deseja cancelar este pedido?');">
                         {% csrf_token %}
-                        <button type="submit" class="btn-mali" style="background:#ff5e9e;">Cancelar pedido</button>
+                        <button type="submit" class="btn-danger">Cancelar pedido</button>
                     </form>
                 {% endif %}
-                <a href="{% url 'pedidos' %}" class="btn-mali">Voltar aos pedidos</a>
+                <a href="{% url 'pedidos' %}" class="btn-secondary">Voltar aos pedidos</a>
             </div>
         </header>
 
         {% if erro %}
-            <p style="color: red; font-weight: bold; margin-bottom: 16px;">{{ erro }}</p>
+            <p class="alerta-erro">{{ erro }}</p>
         {% endif %}
 
         {% if pedido.status == "aguardando_pagamento" %}
-            <p style="font-weight: bold; margin-bottom: 16px;">Aguardando pagamento</p>
+            <div class="pedido-contingencia">
+                <p>Aguardando pagamento</p>
+                <form method="POST" action="{% url 'confirmar_pagamento' pedido.id %}" class="form-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-secondary">Confirmar pagamento</button>
+                </form>
+            </div>
         {% endif %}
 
         {% if pedido.status == "pago" %}
-            <p style="font-weight: bold; margin-bottom: 16px; color: green;">Status: Pago</p>
+            <p class="pedido-status-banner pedido-status-pago">Status: Pago</p>
         {% endif %}
 
         {% if pedido.status == "cancelado" %}
-            <p style="font-weight: bold; margin-bottom: 16px; color: #c0392b;">Status: Cancelado</p>
+            <p class="pedido-status-banner pedido-status-cancelado">Status: Cancelado</p>
         {% endif %}
 
-        <div class="table-container" style="margin-bottom: 20px;">
-            <table>
+        <div class="table-container">
+            <table class="pedido-resumo">
                 <tbody>
                     <tr>
-                        <th style="width:180px;">Número</th>
+                        <th>Número</th>
                         <td>{{ pedido.id }}</td>
                     </tr>
                     <tr>
@@ -80,7 +65,19 @@
                     </tr>
                     <tr>
                         <th>Status</th>
-                        <td>{{ pedido.get_status_display }}</td>
+                        <td>
+                            {% if pedido.status == "pendente" %}
+                                <span class="badge badge-pendente">{{ pedido.get_status_display }}</span>
+                            {% elif pedido.status == "aguardando_pagamento" %}
+                                <span class="badge badge-aguardando">{{ pedido.get_status_display }}</span>
+                            {% elif pedido.status == "pago" %}
+                                <span class="badge badge-pago">{{ pedido.get_status_display }}</span>
+                            {% elif pedido.status == "cancelado" %}
+                                <span class="badge badge-cancelado">{{ pedido.get_status_display }}</span>
+                            {% else %}
+                                {{ pedido.get_status_display }}
+                            {% endif %}
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -99,25 +96,21 @@
                 <tbody>
                     {% for item in itens %}
                     <tr>
-                        <td style="font-weight: 700;">{{ item.produto.nome }}</td>
+                        <td class="celula-forte">{{ item.produto.nome }}</td>
                         <td>{{ item.quantidade }}</td>
                         <td>R$ {{ item.preco_unitario }}</td>
                         <td>R$ {{ item.subtotal }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" style="text-align:center; padding:30px;">
-                            Este pedido não possui itens.
-                        </td>
+                        <td colspan="4" class="celula-vazia">Este pedido não possui itens.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <div style="margin-top: 16px; text-align: right; font-size: 1.1rem; font-weight: 700;">
+        <div class="pedido-total">
             Total do pedido: R$ {{ total }}
         </div>
-    </main>
-</body>
-</html>
+{% endblock %}

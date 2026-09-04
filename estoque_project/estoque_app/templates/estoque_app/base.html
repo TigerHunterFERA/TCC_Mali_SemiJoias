@@ -1,0 +1,19 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Mali Semijoias{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
+</head>
+<body>
+    {% include "estoque_app/includes/sidebar.html" %}
+
+    <main class="main-content">
+        {% block content %}
+        {% endblock %}
+    </main>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -81,7 +81,9 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction, IntegrityError
-from django.db.models import Q
+from django.db.models import Q, Count, Sum, F, DecimalField
+from django.db.models.functions import Coalesce
+from django.utils import timezone
 from django.conf import settings
 from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido, Usuario
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -220,34 +222,82 @@ def pagina_inicial(request):
 
 
 def dashboard(request):
+    """
+    Painel administrativo com indicadores reais do banco.
+    Apenas consulta Produto, Pedido, ItemPedido e MovimentacaoEstoque.
+    Não altera estoque, pedidos nem pagamentos.
+    """
     try:
-        produtos = Produto.objects.all()
+        totais_produto = Produto.objects.aggregate(
+            total=Count("id"),
+            estoque_baixo=Count(
+                "id",
+                filter=Q(estoque__gte=1, estoque__lte=5),
+            ),
+            sem_estoque=Count("id", filter=Q(estoque=0)),
+        )
 
-        total_produtos = produtos.count()
+        totais_pedido = Pedido.objects.aggregate(
+            total=Count("id"),
+            pagos=Count("id", filter=Q(status="pago")),
+            aguardando=Count("id", filter=Q(status="aguardando_pagamento")),
+            pendentes=Count("id", filter=Q(status="pendente")),
+            cancelados=Count("id", filter=Q(status="cancelado")),
+        )
 
-        valor_total = 0
-        estoque_baixo = 0
-        for p in produtos:
-            try:
-                valor_total += float(p.preco) * int(p.estoque)
-            except Exception:
-                pass
+        hoje = timezone.localdate()
+        pedidos_hoje = Pedido.objects.filter(data_pedido__date=hoje).count()
 
-            try:
-                if int(p.estoque) > 0 and int(p.estoque) <= 5:
-                    estoque_baixo += 1
-            except Exception:
-                pass
+        receita_confirmada = ItemPedido.objects.filter(
+            pedido__status="pago",
+        ).aggregate(
+            total=Coalesce(
+                Sum(
+                    F("quantidade") * F("preco_unitario"),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                ),
+                Decimal("0.00"),
+            )
+        )["total"]
+        receita_exibicao = f"{receita_confirmada:.2f}".replace(".", ",")
+
+        ultimos_pedidos = list(
+            Pedido.objects.select_related("usuario")
+            .prefetch_related("itempedido_set")
+            .order_by("-data_pedido", "-id")[:5]
+        )
+        for pedido in ultimos_pedidos:
+            total = Decimal("0.00")
+            for item in pedido.itempedido_set.all():
+                total = total + (item.quantidade * item.preco_unitario)
+            pedido.total_exibicao = f"{total:.2f}".replace(".", ",")
+
+        ultimas_movimentacoes = (
+            MovimentacaoEstoque.objects.select_related("produto")
+            .order_by("-data", "-id")[:5]
+        )
+
+        produtos_atencao = Produto.objects.filter(
+            estoque__lte=5,
+        ).order_by("estoque", "nome")[:8]
 
         return render(
             request,
             "estoque_app/dashboard.html",
             {
-                "total_produtos": total_produtos,
-                "pedidos_hoje": 0,
-                "receita_total": 0,
-                "estoque_baixo": estoque_baixo,
-                "valor_total": round(valor_total, 2),
+                "total_produtos": totais_produto["total"],
+                "estoque_baixo": totais_produto["estoque_baixo"],
+                "sem_estoque": totais_produto["sem_estoque"],
+                "total_pedidos": totais_pedido["total"],
+                "pedidos_pagos": totais_pedido["pagos"],
+                "pedidos_aguardando": totais_pedido["aguardando"],
+                "pedidos_pendentes": totais_pedido["pendentes"],
+                "pedidos_cancelados": totais_pedido["cancelados"],
+                "pedidos_hoje": pedidos_hoje,
+                "receita_exibicao": receita_exibicao,
+                "ultimos_pedidos": ultimos_pedidos,
+                "ultimas_movimentacoes": ultimas_movimentacoes,
+                "produtos_atencao": produtos_atencao,
             },
         )
     except Exception as e:

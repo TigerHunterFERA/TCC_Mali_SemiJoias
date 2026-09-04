@@ -1,0 +1,50 @@
+<nav class="sidebar">
+    <div class="sidebar-header">
+        <h2>MALI</h2>
+    </div>
+
+    {% with url_atual=request.resolver_match.url_name %}
+    <div class="sidebar-menu">
+        <a
+            href="{% url 'pagina_inicial' %}"
+            class="sidebar-link{% if url_atual == 'pagina_inicial' %} ativo{% endif %}"
+        >
+            Página Inicial
+        </a>
+        <a
+            href="{% url 'produtos' %}"
+            class="sidebar-link{% if url_atual == 'produtos' or url_atual == 'adicionar' or url_atual == 'editar' or url_atual == 'movimentar' %} ativo{% endif %}"
+        >
+            Produtos
+        </a>
+        <a
+            href="{% url 'pedidos' %}"
+            class="sidebar-link{% if url_atual == 'pedidos' or url_atual == 'novo_pedido' or url_atual == 'detalhe_pedido' or url_atual == 'adicionar_item_pedido' %} ativo{% endif %}"
+        >
+            Pedidos
+        </a>
+        <a
+            href="{% url 'movimentacoes' %}"
+            class="sidebar-link{% if url_atual == 'movimentacoes' %} ativo{% endif %}"
+        >
+            Movimentações
+        </a>
+    </div>
+
+    <div class="sidebar-section">
+        <p class="sidebar-section-title">Outros</p>
+        <a
+            href="{% url 'clientes' %}"
+            class="sidebar-link{% if url_atual == 'clientes' or url_atual == 'editar_telefone_cliente' %} ativo{% endif %}"
+        >
+            Clientes
+        </a>
+        <a
+            href="{% url 'dashboard' %}"
+            class="sidebar-link{% if url_atual == 'dashboard' %} ativo{% endif %}"
+        >
+            Dashboard
+        </a>
+    </div>
+    {% endwith %}
+</nav>
