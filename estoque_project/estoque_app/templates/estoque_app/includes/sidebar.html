@@ -47,4 +47,11 @@
         </a>
     </div>
     {% endwith %}
+
+    <div class="sidebar-sair-area">
+        <form action="{% url 'logout' %}" method="post">
+            {% csrf_token %}
+            <button type="submit" class="sidebar-sair">Sair</button>
+        </form>
+    </div>
 </nav>

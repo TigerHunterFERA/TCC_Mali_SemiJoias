@@ -1,17 +1,22 @@
 {% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-    <title>Login - Estoque</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login - Mali Semijoias</title>
     <link rel="stylesheet" href="{% static 'estoque_app/style.css' %}">
 </head>
 <body class="login-page">
     <div class="login-box">
+        <p class="login-marca">MALI Semi Joias</p>
         <h2>Login</h2>
-        <form method="POST" action="/login/">
+        <form method="POST" action="{% url 'login' %}">
             {% csrf_token %}
-            <input type="text" name="usuario" placeholder="Usuário" required>
-            <input type="password" name="senha" placeholder="Senha" required>
+            <label for="email">E-mail</label>
+            <input type="email" id="email" name="email" placeholder="E-mail" required>
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" name="senha" placeholder="Senha" required>
             <button type="submit">Entrar</button>
         </form>
         {% if mensagem %}<p class="erro">{{ mensagem }}</p>{% endif %}

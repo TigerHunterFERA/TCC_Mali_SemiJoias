@@ -76,10 +76,12 @@
 #     salvar_dados(dados)
 #     return redirect("produtos")
 
+from functools import wraps
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.hashers import check_password, make_password, identify_hasher
 from django.db import transaction, IntegrityError
 from django.db.models import Q, Count, Sum, F, DecimalField
 from django.db.models.functions import Coalesce
@@ -202,27 +204,101 @@ def obter_banho_do_formulario(request):
 
     return None
 
+
+def senha_armazenada_e_hash(senha_armazenada):
+    """True se o valor já estiver no formato de hash do Django."""
+    if not senha_armazenada:
+        return False
+    try:
+        identify_hasher(senha_armazenada)
+        return True
+    except ValueError:
+        return False
+
+
+def senha_admin_confere(usuario, senha_digitada):
+    """
+    Confere a senha do administrador.
+    Se ainda estiver em texto puro (legado), compara e grava hash no primeiro acerto.
+    """
+    senha_digitada = senha_digitada or ""
+    senha_armazenada = usuario.senha or ""
+
+    if senha_armazenada_e_hash(senha_armazenada):
+        return check_password(senha_digitada, senha_armazenada)
+
+    if senha_digitada and senha_digitada == senha_armazenada:
+        usuario.senha = make_password(senha_digitada)
+        usuario.save(update_fields=["senha"])
+        return True
+
+    return False
+
+
+def exigir_login_admin(view_func):
+    """Redireciona para o login se a sessão administrativa não estiver válida."""
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not request.session.get("autenticado"):
+            return redirect("login")
+        if not request.session.get("usuario_id"):
+            return redirect("login")
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped
+
+
 def login(request):
+    """Login administrativo único. Não cria conta e não autentica cliente."""
+    if request.method != "POST" and request.session.get("autenticado"):
+        return redirect("pagina_inicial")
+
     if request.method == "POST":
-        usuario = request.POST.get("usuario")
-        senha = request.POST.get("senha")
+        email = (request.POST.get("email") or "").strip()
+        senha = request.POST.get("senha") or ""
+        mensagem_erro = "E-mail ou senha inválidos."
 
-        # Aqui você pode validar usuário/senha futuramente
-        if usuario and senha:
-            # Login válido: vai para a Página Inicial (não para o dashboard)
-            return redirect("pagina_inicial")
-        else:
-            return render(request, "estoque_app/login.html", {"mensagem": "Usuário ou senha inválidos."})
+        if not email or not senha:
+            return render(
+                request,
+                "estoque_app/login.html",
+                {"mensagem": mensagem_erro},
+            )
 
-    # Se for GET, apenas renderiza a tela de login
+        admin = Usuario.objects.filter(
+            email__iexact=email,
+            tipo="admin",
+        ).first()
+
+        if admin is None or not senha_admin_confere(admin, senha):
+            return render(
+                request,
+                "estoque_app/login.html",
+                {"mensagem": mensagem_erro},
+            )
+
+        request.session.cycle_key()
+        request.session["usuario_id"] = admin.id
+        request.session["autenticado"] = True
+        return redirect("pagina_inicial")
+
     return render(request, "estoque_app/login.html")
 
 
+@require_POST
+def logout(request):
+    """Encerra a sessão administrativa e volta ao login."""
+    request.session.flush()
+    return redirect("login")
+
+
+@exigir_login_admin
 def pagina_inicial(request):
     """Tela de entrada após o login, com atalhos para os módulos."""
     return render(request, "estoque_app/pagina_inicial.html")
 
 
+@exigir_login_admin
 def dashboard(request):
     """
     Painel administrativo com indicadores reais do banco.
@@ -355,11 +431,13 @@ def dashboard(request):
 #     salvar_dados(dados)
 #     return redirect("produtos")
 
+@exigir_login_admin
 def listar_produtos(request):
     # select_related evita consulta extra ao mostrar o nome do banho
     produtos = Produto.objects.select_related("banho").all()
     return render(request, "estoque_app/produtos.html", {"produtos": produtos})
 
+@exigir_login_admin
 def adicionar_produto(request):
     if request.method == "POST":
         erro = validar_produto(request)
@@ -391,6 +469,7 @@ def adicionar_produto(request):
     tipos_banho = TipoBanho.objects.all().order_by("nome")
     return render(request, "estoque_app/adicionar.html", {"tipos_banho": tipos_banho})
 
+@exigir_login_admin
 def editar_produto(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
 
@@ -429,6 +508,7 @@ def editar_produto(request, produto_id):
         {"produto": produto, "tipos_banho": tipos_banho},
     )
 
+@exigir_login_admin
 @require_POST
 def remover_produto(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
@@ -472,6 +552,7 @@ def validar_movimentacao(request, produto):
     return None
 
 
+@exigir_login_admin
 def movimentar_estoque(request, produto_id):
     produto = get_object_or_404(Produto, id=produto_id)
 
@@ -506,6 +587,7 @@ def movimentar_estoque(request, produto_id):
     return render(request, "estoque_app/movimentar.html", {"produto": produto})
 
 
+@exigir_login_admin
 def listar_movimentacoes(request):
     movimentacoes = (
         MovimentacaoEstoque.objects.select_related("produto")
@@ -518,6 +600,7 @@ def listar_movimentacoes(request):
     )
 
 
+@exigir_login_admin
 def listar_pedidos(request):
     """Lista os pedidos existentes."""
     pedidos = (
@@ -527,6 +610,7 @@ def listar_pedidos(request):
     return render(request, "estoque_app/pedidos.html", {"pedidos": pedidos})
 
 
+@exigir_login_admin
 def criar_pedido(request):
     """Cria um pedido escolhendo apenas o cliente (status padrão do model)."""
     clientes = Usuario.objects.filter(tipo="cliente").order_by("nome")
@@ -591,6 +675,7 @@ def montar_contexto_detalhe_pedido(pedido, erro=None):
     return contexto
 
 
+@exigir_login_admin
 def detalhe_pedido(request, pedido_id):
     """Mostra os dados de um pedido e seus itens."""
     pedido = get_object_or_404(
@@ -605,6 +690,7 @@ def detalhe_pedido(request, pedido_id):
     )
 
 
+@exigir_login_admin
 @require_POST
 def finalizar_pedido(request, pedido_id):
     """
@@ -711,6 +797,7 @@ def confirmar_pagamento_do_pedido(pedido_id):
     return True, None
 
 
+@exigir_login_admin
 @require_POST
 def confirmar_pagamento(request, pedido_id):
     """
@@ -732,6 +819,7 @@ def confirmar_pagamento(request, pedido_id):
     return redirect("detalhe_pedido", pedido_id=pedido_id)
 
 
+@exigir_login_admin
 @require_POST
 def cancelar_pedido(request, pedido_id):
     """
@@ -779,6 +867,7 @@ def cancelar_pedido(request, pedido_id):
     return redirect("detalhe_pedido", pedido_id=pedido.id)
 
 
+@exigir_login_admin
 def adicionar_item_pedido(request, pedido_id):
     """Adiciona um item ao pedido (um por vez). Não altera o estoque do produto."""
     pedido = get_object_or_404(
@@ -934,6 +1023,7 @@ def validar_telefone_cliente(request):
     return telefone, None
 
 
+@exigir_login_admin
 def listar_clientes(request):
     """Lista usuários do tipo cliente (nome, e-mail e telefone)."""
     clientes = Usuario.objects.filter(tipo="cliente").order_by("nome")
@@ -945,6 +1035,7 @@ def listar_clientes(request):
     return render(request, "estoque_app/clientes.html", {"clientes": clientes})
 
 
+@exigir_login_admin
 def editar_telefone_cliente(request, cliente_id):
     """Permite editar apenas o telefone de um cliente existente."""
     cliente = get_object_or_404(Usuario, id=cliente_id, tipo="cliente")
@@ -1141,6 +1232,7 @@ def tentar_enviar_foto_produto_waha(numero, produto_id):
         return False
 
 
+@exigir_login_admin
 def teste_waha(request):
     """Tela simples para provar o envio Django → WAHA → WhatsApp."""
     contexto = {

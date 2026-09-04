@@ -350,6 +350,27 @@ body {
     opacity: 1;
 }
 
+.sidebar-sair-area {
+    margin-top: auto;
+    padding-top: 18px;
+}
+
+.sidebar-sair {
+    width: 100%;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    color: var(--mali-surface);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.sidebar-sair:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
 .main-content {
     margin-left: 260px;
     flex: 1;
@@ -942,6 +963,22 @@ tbody tr:last-child td {
     margin-bottom: 18px;
     color: var(--mali-primary-dark);
     font-size: 1.6rem;
+}
+
+.login-marca {
+    text-align: center;
+    margin: 0 0 6px;
+    letter-spacing: 0.12em;
+    font-weight: 800;
+    color: var(--mali-primary-dark);
+}
+
+.login-box label {
+    display: block;
+    margin-top: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--mali-text-muted);
 }
 
 .login-box h2::after {
