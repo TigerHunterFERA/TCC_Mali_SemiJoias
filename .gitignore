@@ -1,6 +1,9 @@
 ﻿.venv/
 venv/
 
+# Uploads de fotos dos produtos (arquivos de usuários)
+media/
+
 __pycache__/
 *.pyc
 *.pyo

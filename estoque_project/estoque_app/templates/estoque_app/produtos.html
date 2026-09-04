@@ -21,6 +21,7 @@
             <table>
                 <thead>
                     <tr>
+                        <th>Foto</th>
                         <th>Produto</th>
                         <th>Descrição</th>
                         <th>Categoria</th>
@@ -34,6 +35,13 @@
                 <tbody>
                     {% for produto in produtos %}
                     <tr>
+                        <td class="celula-foto">
+                            {% if produto.foto %}
+                                <img src="{{ produto.foto.url }}" alt="{{ produto.nome }}" class="produto-miniatura">
+                            {% else %}
+                                <span class="produto-foto-placeholder">Sem foto</span>
+                            {% endif %}
+                        </td>
                         <td class="celula-forte">{{ produto.nome }}</td>
                         <td class="celula-descricao">{{ produto.descricao|default:"-" }}</td>
                         <td>{{ produto.categoria }}</td>
@@ -62,7 +70,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="celula-vazia">Nenhum produto cadastrado no momento.</td>
+                        <td colspan="9" class="celula-vazia">Nenhum produto cadastrado no momento.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

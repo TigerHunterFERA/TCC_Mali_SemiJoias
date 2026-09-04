@@ -15,7 +15,7 @@
         {% endif %}
 
         <div class="card">
-            <form method="POST" class="form-container editar-produto-form">
+            <form method="POST" class="form-container editar-produto-form" enctype="multipart/form-data">
                 {% csrf_token %}
 
                 <div class="form-group">
@@ -96,6 +96,19 @@
                 <div class="form-group estoque-edicao-descricao">
                     <label>Descrição</label>
                     <textarea name="descricao">{{ produto.descricao }}</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Foto do produto</label>
+                    {% if produto.foto %}
+                        <p class="form-ajuda">Foto atual</p>
+                        <img src="{{ produto.foto.url }}" alt="Foto atual de {{ produto.nome }}" class="produto-foto-atual">
+                    {% else %}
+                        <p class="form-ajuda">Sem foto cadastrada.</p>
+                        <div class="produto-foto-placeholder produto-foto-placeholder-grande">Sem foto</div>
+                    {% endif %}
+                    <label for="foto">Nova foto</label>
+                    <input type="file" name="foto" id="foto" accept="image/*">
                 </div>
 
                 <div class="form-actions estoque-edicao-botoes">

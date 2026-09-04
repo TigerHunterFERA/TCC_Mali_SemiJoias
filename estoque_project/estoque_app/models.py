@@ -73,6 +73,12 @@ class Produto(models.Model):
         blank=True,
     )
     criado_em = models.DateTimeField(auto_now_add=True)
+    # Foto principal opcional: produtos antigos continuam válidos sem imagem.
+    foto = models.ImageField(
+        upload_to="produtos/",
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         db_table = 'produtos'

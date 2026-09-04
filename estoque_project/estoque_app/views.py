@@ -382,6 +382,7 @@ def adicionar_produto(request):
             categoria=request.POST.get("categoria"),
             peso=obter_peso_do_formulario(request),
             banho=obter_banho_do_formulario(request),
+            foto=request.FILES.get("foto") or None,
         )
         return redirect("produtos")
 
@@ -413,6 +414,9 @@ def editar_produto(request, produto_id):
         produto.categoria = request.POST.get("categoria")
         produto.peso = obter_peso_do_formulario(request)
         produto.banho = obter_banho_do_formulario(request)
+        nova_foto = request.FILES.get("foto")
+        if nova_foto:
+            produto.foto = nova_foto
         produto.save()
         return redirect("produtos")
 
