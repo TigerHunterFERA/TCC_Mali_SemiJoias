@@ -91,6 +91,8 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
 import requests
 import secrets
+import base64
+import mimetypes
 from urllib.parse import quote
 
 #def validar_produto(request):
@@ -1032,6 +1034,111 @@ def enviar_mensagem_waha(numero, mensagem):
         return False, "Não autorizado pelo WAHA. Verifique a API Key."
 
     return False, f"O WAHA retornou o status {resposta.status_code}."
+
+
+def enviar_imagem_waha(numero, dados_base64, nome_arquivo, mimetype, caption=""):
+    """
+    Envia uma imagem pelo WAHA (POST /api/sendImage).
+    Usa base64 para o container Docker não precisar ler o disco do Django.
+    Retorna (True, texto) em sucesso ou (False, texto) em erro.
+    """
+    digitos = "".join(c for c in str(numero) if c.isdigit())
+
+    if not digitos:
+        return False, "Informe um número válido."
+
+    if not dados_base64:
+        return False, "Informe o conteúdo da imagem."
+
+    chat_id = f"{digitos}@c.us"
+    url = settings.WAHA_API_URL.rstrip("/") + "/api/sendImage"
+    arquivo = {
+        "mimetype": mimetype,
+        "filename": nome_arquivo,
+        "data": dados_base64,
+    }
+    corpo = {
+        "session": settings.WAHA_SESSION,
+        "chatId": chat_id,
+        "file": arquivo,
+    }
+    if caption:
+        corpo["caption"] = caption
+
+    cabecalhos = {
+        "Content-Type": "application/json",
+        "X-Api-Key": settings.WAHA_API_KEY,
+    }
+
+    try:
+        resposta = requests.post(
+            url,
+            json=corpo,
+            headers=cabecalhos,
+            timeout=15,
+        )
+    except requests.exceptions.RequestException:
+        return False, "Não foi possível conectar ao WAHA."
+
+    if resposta.status_code in (200, 201):
+        return True, "Imagem enviada com sucesso pelo WAHA."
+
+    if resposta.status_code == 401:
+        return False, "Não autorizado pelo WAHA. Verifique a API Key."
+
+    return False, f"O WAHA retornou o status {resposta.status_code}."
+
+
+def tentar_enviar_foto_produto_waha(numero, produto_id):
+    """
+    Tenta enviar a foto principal do Produto pelo WhatsApp.
+    A imagem vem somente de Produto.foto. Falha não interrompe o fluxo textual.
+    """
+    try:
+        produto = Produto.objects.filter(id=produto_id).first()
+        if produto is None:
+            print("Foto do produto não enviada; fluxo textual preservado.")
+            return False
+
+        if not produto.foto:
+            print("Ação: produto selecionado")
+            print("Foto: não cadastrada")
+            return False
+
+        if not produto.foto.storage.exists(produto.foto.name):
+            print("Foto do produto não enviada; fluxo textual preservado.")
+            return False
+
+        with produto.foto.open("rb") as arquivo_foto:
+            conteudo = arquivo_foto.read()
+
+        if not conteudo:
+            print("Foto do produto não enviada; fluxo textual preservado.")
+            return False
+
+        nome_arquivo = str(produto.foto.name).replace("\\", "/").split("/")[-1]
+        mimetype, _extensao = mimetypes.guess_type(nome_arquivo)
+        if not mimetype or not mimetype.startswith("image/"):
+            mimetype = "image/jpeg"
+
+        dados_base64 = base64.b64encode(conteudo).decode("ascii")
+        sucesso, _mensagem = enviar_imagem_waha(
+            numero,
+            dados_base64,
+            nome_arquivo,
+            mimetype,
+            caption=produto.nome,
+        )
+        if sucesso:
+            print("Ação: foto do produto enviada")
+            print(f"Produto: {produto.nome}")
+            return True
+
+        print("Foto do produto não enviada; fluxo textual preservado.")
+        return False
+    except Exception:
+        print("Foto do produto não enviada; fluxo textual preservado.")
+        return False
 
 
 def teste_waha(request):
@@ -2198,6 +2305,11 @@ def webhook_waha(request):
                     clientes_aguardando_produto.pop(telefone, None)
                     clientes_aguardando_quantidade[telefone] = (
                         produto_id_selecionado
+                    )
+                    # Foto primeiro; o texto da quantidade segue abaixo.
+                    tentar_enviar_foto_produto_waha(
+                        telefone,
+                        produto_id_selecionado,
                     )
             elif telefone in clientes_aguardando_finalizacao:
                 pedido_id_finalizacao = clientes_aguardando_finalizacao[telefone]
