@@ -1372,6 +1372,11 @@ clientes_aguardando_finalizacao = {}
 # ele usa externalId no formato pedido-<id>.
 cobrancas_abacatepay_whatsapp = {}
 
+# Último produto escolhido por número no catálogo (Bloco 22.3).
+# telefone -> id do Produto. Só leitura depois; não cria pedido.
+# Se o Django reiniciar, este dicionário é perdido — esperado nesta etapa.
+clientes_produto_em_contexto = {}
+
 
 def validar_nome_whatsapp(nome):
     """
@@ -1602,20 +1607,172 @@ ALIASES_PAGAMENTO_WHATSAPP = {
     "onde eu pago",
 }
 
+# Frases de preço, estoque e detalhes (já normalizadas).
+ALIASES_PRECO_WHATSAPP = {
+    "preco",
+    "valor",
+    "quanto custa",
+    "quanto e",
+    "qual o preco",
+    "qual o valor",
+    "quanto custa esse produto",
+    "quanto custa esse brinco",
+    "preco do produto",
+    "valor do produto",
+    "quanto sai",
+    "quanto fica",
+    "me passa o preco",
+    "me fala o valor",
+    "tem preco",
+    "qto custa",
+    "qt custa",
+    "quanto ta",
+    "valor desse produto",
+}
+
+ALIASES_ESTOQUE_WHATSAPP = {
+    "tem estoque",
+    "tem disponivel",
+    "esta disponivel",
+    "ainda tem",
+    "tem esse produto",
+    "tem essa peca",
+    "quantos tem",
+    "quantas unidades tem",
+    "tem pronta entrega",
+    "esta em estoque",
+    "estoque desse produto",
+    "ver estoque",
+    "acabou",
+    "esta esgotado",
+    "tem disponibilidade",
+    "tem mais de um",
+}
+
+ALIASES_DETALHES_WHATSAPP = {
+    "detalhes",
+    "ver detalhes",
+    "detalhes do produto",
+    "mais detalhes",
+    "quero saber mais",
+    "me fala mais desse produto",
+    "qual a descricao",
+    "qual o material",
+    "qual o banho",
+    "tem descricao",
+    "me mostra a descricao",
+    "informacoes do produto",
+    "info do produto",
+    "ver informacoes",
+    "qual o peso",
+    "essa peca e dourada",
+    "essa peca e prata",
+}
+
+# Chave interna -> título da lista e termos para filtrar tipo/nome no banco.
+# O campo Produto.categoria no banco atual é "Feminina", não o tipo da peça.
+CATEGORIAS_WHATSAPP = {
+    "brinco": {
+        "titulo": "Brincos",
+        "termos": ["brinco", "brincos"],
+    },
+    "colar": {
+        "titulo": "Colares",
+        "termos": ["colar", "colares"],
+    },
+    "pulseira": {
+        "titulo": "Pulseiras",
+        "termos": ["pulseira", "pulseiras"],
+    },
+    "anel": {
+        "titulo": "Anéis",
+        "termos": ["anel", "aneis"],
+    },
+    "conjunto": {
+        "titulo": "Conjuntos",
+        "termos": ["conjunto", "conjuntos"],
+    },
+    "argola": {
+        "titulo": "Argolas",
+        "termos": ["argola", "argolas"],
+    },
+    "corrente": {
+        "titulo": "Correntes",
+        "termos": ["corrente", "correntes"],
+    },
+    "gargantilha": {
+        "titulo": "Gargantilhas",
+        "termos": ["gargantilha", "gargantilhas"],
+    },
+    "bracelete": {
+        "titulo": "Braceletes",
+        "termos": ["bracelete", "braceletes"],
+    },
+}
+
+MENSAGEM_SEM_PRODUTO_CONTEXTO = (
+    "Escolha primeiro um produto do catálogo. "
+    "Envie o número do produto depois de ver a lista."
+)
+
 
 INTENCOES_WHATSAPP_PERMITIDAS = {
     "consultar_catalogo",
     "consultar_pedidos",
     "iniciar_finalizacao",
     "consultar_pagamento",
+    "buscar_categoria",
+    "detalhar_produto",
+    "consultar_preco",
+    "consultar_estoque",
     "desconhecida",
 }
+
+
+def identificar_categoria_whatsapp(texto):
+    """
+    Lê um texto já normalizado (ou normaliza se ainda não estiver)
+    e devolve a chave de CATEGORIAS_WHATSAPP, ou None.
+    Termos mais específicos vêm primeiro (ex.: gargantilha antes de colar).
+    """
+    texto = normalizar_mensagem(texto)
+    if texto == "":
+        return None
+
+    if "gargantilha" in texto:
+        return "gargantilha"
+    elif "bracelete" in texto:
+        return "bracelete"
+    elif "conjunto" in texto:
+        return "conjunto"
+    elif "argola" in texto:
+        return "argola"
+    elif "corrente" in texto:
+        return "corrente"
+    elif "brinco" in texto:
+        return "brinco"
+    elif "colar" in texto:
+        return "colar"
+    elif "pulseira" in texto:
+        return "pulseira"
+    elif "anel" in texto or "aneis" in texto:
+        return "anel"
+
+    return None
 
 
 def interpretar_intencao_whatsapp(mensagem):
     """
     Classifica frases naturais no contrato fechado {"intencao": ...}.
     Não acessa banco, não altera pedido/estoque e não chama WAHA.
+
+    Ordem (para não misturar preço com categoria):
+    1. catálogo, pedidos, finalização e pagamento (BLOCO 22.2);
+    2. preço;
+    3. estoque;
+    4. detalhes;
+    5. categoria (palavra no texto);
+    6. desconhecida.
     """
     texto = normalizar_mensagem(mensagem)
 
@@ -1627,6 +1784,14 @@ def interpretar_intencao_whatsapp(mensagem):
         intencao = "iniciar_finalizacao"
     elif texto in COMANDOS_PAGAMENTO_WHATSAPP or texto in ALIASES_PAGAMENTO_WHATSAPP:
         intencao = "consultar_pagamento"
+    elif texto in ALIASES_PRECO_WHATSAPP:
+        intencao = "consultar_preco"
+    elif texto in ALIASES_ESTOQUE_WHATSAPP:
+        intencao = "consultar_estoque"
+    elif texto in ALIASES_DETALHES_WHATSAPP:
+        intencao = "detalhar_produto"
+    elif identificar_categoria_whatsapp(texto) is not None:
+        intencao = "buscar_categoria"
     else:
         intencao = "desconhecida"
 
@@ -1684,6 +1849,131 @@ def montar_catalogo_whatsapp():
     linhas.append("Envie o número do produto que deseja conhecer melhor.")
 
     return "\n".join(linhas).strip(), "catálogo enviado", ids
+
+
+def formatar_preco_whatsapp(preco):
+    """Formata Decimal do banco para o padrão já usado no catálogo."""
+    return f"{preco:.2f}".replace(".", ",")
+
+
+def montar_catalogo_categoria_whatsapp(chave_categoria):
+    """
+    Lista produtos com estoque > 0 cujo tipo ou nome combina com a categoria.
+    Somente leitura. Devolve (texto, acao, ids) no mesmo formato do catálogo.
+    """
+    info = CATEGORIAS_WHATSAPP.get(chave_categoria)
+    if info is None:
+        return (
+            "Não encontrei essa categoria. Envie produtos para ver o catálogo.",
+            "categoria não reconhecida",
+            [],
+        )
+
+    filtro = Q()
+    for termo in info["termos"]:
+        filtro = filtro | Q(tipo__icontains=termo) | Q(nome__icontains=termo)
+
+    produtos = list(
+        Produto.objects.filter(estoque__gt=0).filter(filtro).order_by("nome")
+    )
+    titulo = info["titulo"]
+
+    if not produtos:
+        return (
+            f"No momento não temos {titulo.lower()} disponíveis em estoque.",
+            "categoria vazia",
+            [],
+        )
+
+    linhas = [f"{titulo} disponíveis:", ""]
+    ids = []
+    for indice, produto in enumerate(produtos, start=1):
+        preco_texto = formatar_preco_whatsapp(produto.preco)
+        linhas.append(f"{indice}. {produto.nome}")
+        linhas.append(f"Preço: R$ {preco_texto}")
+        linhas.append(f"Estoque: {produto.estoque}")
+        linhas.append("")
+        ids.append(produto.id)
+
+    linhas.append("Envie o número do produto que deseja conhecer melhor.")
+    return "\n".join(linhas).strip(), "categoria enviada", ids
+
+
+def obter_produto_contexto_whatsapp(produto_id):
+    """Busca o Produto pelo id. Não altera estoque. None se o id for inválido."""
+    if produto_id is None:
+        return None
+    return Produto.objects.filter(id=produto_id).first()
+
+
+def montar_consulta_preco_whatsapp(produto_id):
+    """Responde o preço real do produto em contexto. Somente leitura."""
+    produto = obter_produto_contexto_whatsapp(produto_id)
+    if produto is None:
+        return MENSAGEM_SEM_PRODUTO_CONTEXTO, "preço sem produto"
+
+    preco_texto = formatar_preco_whatsapp(produto.preco)
+    texto = (
+        f"Produto: {produto.nome}\n"
+        f"Preço: R$ {preco_texto}"
+    )
+    return texto, "preço enviado"
+
+
+def montar_consulta_estoque_whatsapp(produto_id):
+    """Responde o estoque real do produto em contexto. Não altera o banco."""
+    produto = obter_produto_contexto_whatsapp(produto_id)
+    if produto is None:
+        return MENSAGEM_SEM_PRODUTO_CONTEXTO, "estoque sem produto"
+
+    if produto.estoque <= 0:
+        texto = (
+            f"Produto: {produto.nome}\n"
+            "Estoque: indisponível (esgotado)."
+        )
+        return texto, "estoque esgotado"
+
+    texto = (
+        f"Produto: {produto.nome}\n"
+        f"Estoque disponível: {produto.estoque} unidade(s)"
+    )
+    return texto, "estoque enviado"
+
+
+def montar_detalhes_produto_whatsapp(produto_id):
+    """
+    Mostra campos reais e preenchidos do Produto em contexto.
+    Não envia id, foto nem caminhos de arquivo.
+    """
+    produto = obter_produto_contexto_whatsapp(produto_id)
+    if produto is None:
+        return MENSAGEM_SEM_PRODUTO_CONTEXTO, "detalhes sem produto"
+
+    linhas = [f"Produto: {produto.nome}"]
+
+    descricao = (produto.descricao or "").strip()
+    if descricao:
+        linhas.append(f"Descrição: {descricao}")
+
+    linhas.append(f"Preço: R$ {formatar_preco_whatsapp(produto.preco)}")
+
+    tipo = (produto.tipo or "").strip()
+    if tipo:
+        linhas.append(f"Tipo: {tipo}")
+
+    categoria = (produto.categoria or "").strip()
+    if categoria:
+        linhas.append(f"Categoria: {categoria}")
+
+    if produto.banho_id and produto.banho:
+        linhas.append(f"Banho: {produto.banho.nome}")
+
+    if produto.peso is not None:
+        peso_texto = f"{produto.peso:.2f}".replace(".", ",")
+        linhas.append(f"Peso: {peso_texto} g")
+
+    linhas.append(f"Estoque: {produto.estoque}")
+    return "\n".join(linhas), "detalhes enviados"
 
 
 def montar_pedidos_whatsapp(cliente):
@@ -2454,6 +2744,8 @@ def webhook_waha(request):
                     "pedido criado",
                 ):
                     clientes_aguardando_confirmacao.pop(telefone, None)
+                if acao_exibicao == "produto indisponível":
+                    clientes_produto_em_contexto.pop(telefone, None)
             elif telefone in clientes_aguardando_quantidade:
                 produto_id = clientes_aguardando_quantidade[telefone]
                 (
@@ -2470,6 +2762,7 @@ def webhook_waha(request):
                     }
                 elif acao_exibicao == "produto indisponível":
                     clientes_aguardando_quantidade.pop(telefone, None)
+                    clientes_produto_em_contexto.pop(telefone, None)
             elif telefone in clientes_aguardando_produto:
                 ids_catalogo = clientes_aguardando_produto[telefone]
                 (
@@ -2484,6 +2777,9 @@ def webhook_waha(request):
                 if acao_exibicao == "produto selecionado":
                     clientes_aguardando_produto.pop(telefone, None)
                     clientes_aguardando_quantidade[telefone] = (
+                        produto_id_selecionado
+                    )
+                    clientes_produto_em_contexto[telefone] = (
                         produto_id_selecionado
                     )
                     # Foto primeiro; o texto da quantidade segue abaixo.
@@ -2555,6 +2851,36 @@ def webhook_waha(request):
                 elif intencao == "consultar_pagamento":
                     texto_resposta, acao_exibicao, pedido_exibicao = (
                         montar_instrucoes_pagamento_whatsapp(cliente)
+                    )
+                elif intencao == "buscar_categoria":
+                    chave_categoria = identificar_categoria_whatsapp(mensagem)
+                    texto_resposta, acao_exibicao, ids_catalogo = (
+                        montar_catalogo_categoria_whatsapp(chave_categoria)
+                    )
+                    if ids_catalogo:
+                        clientes_aguardando_produto[telefone] = ids_catalogo
+                    else:
+                        clientes_aguardando_produto.pop(telefone, None)
+                elif intencao == "consultar_preco":
+                    produto_id_contexto = clientes_produto_em_contexto.get(
+                        telefone
+                    )
+                    texto_resposta, acao_exibicao = (
+                        montar_consulta_preco_whatsapp(produto_id_contexto)
+                    )
+                elif intencao == "consultar_estoque":
+                    produto_id_contexto = clientes_produto_em_contexto.get(
+                        telefone
+                    )
+                    texto_resposta, acao_exibicao = (
+                        montar_consulta_estoque_whatsapp(produto_id_contexto)
+                    )
+                elif intencao == "detalhar_produto":
+                    produto_id_contexto = clientes_produto_em_contexto.get(
+                        telefone
+                    )
+                    texto_resposta, acao_exibicao = (
+                        montar_detalhes_produto_whatsapp(produto_id_contexto)
                     )
                 else:
                     texto_resposta = (
