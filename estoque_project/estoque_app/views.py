@@ -91,6 +91,8 @@ from .models import Produto, TipoBanho, MovimentacaoEstoque, Pedido, ItemPedido,
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 # from django.shortcuts import render, redirect
 import json
+import re
+import unicodedata
 import requests
 import secrets
 import base64
@@ -1446,11 +1448,30 @@ def salvar_cliente_whatsapp(nome, telefone):
         return None, None
 
 
+def normalizar_mensagem(texto):
+    """
+    Normaliza texto do WhatsApp para comparar comandos e frases.
+    Não acessa banco, não chama WAHA e não altera pedido nem estoque.
+    """
+    if texto is None:
+        return ""
+
+    texto = str(texto).strip().casefold()
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(
+        caractere
+        for caractere in texto
+        if not unicodedata.combining(caractere)
+    )
+    texto = re.sub(r"[^a-z0-9]+", " ", texto)
+    texto = re.sub(r" +", " ", texto)
+    return texto.strip()
+
+
 COMANDOS_CATALOGO_WHATSAPP = {
     "produto",
     "produtos",
     "catalogo",
-    "catálogo",
 }
 
 COMANDOS_PEDIDOS_WHATSAPP = {
@@ -1527,9 +1548,7 @@ def interpretar_intencao_whatsapp(mensagem):
     Classifica frases naturais no contrato fechado {"intencao": ...}.
     Não acessa banco, não altera pedido/estoque e não chama WAHA.
     """
-    texto = (mensagem or "").strip().lower()
-    if texto.endswith("?"):
-        texto = texto[:-1].strip()
+    texto = normalizar_mensagem(mensagem)
 
     if texto in FRASES_CATALOGO_WHATSAPP:
         intencao = "consultar_catalogo"
@@ -2334,7 +2353,7 @@ def webhook_waha(request):
         ).first()
         if cliente:
             cliente_exibicao = cliente.nome
-            mensagem_normalizada = mensagem.strip().lower()
+            mensagem_normalizada = normalizar_mensagem(mensagem)
             # Novo catálogo cancela quantidade/confirmação/finalização e substitui a lista.
             if mensagem_normalizada in COMANDOS_CATALOGO_WHATSAPP:
                 clientes_aguardando_quantidade.pop(telefone, None)
