@@ -1495,42 +1495,111 @@ COMANDOS_PAGAMENTO_WHATSAPP = {
 # Comando explícito de Sandbox/Dev Mode. Não passa pela IA.
 COMANDO_SIMULAR_PAGAMENTO_WHATSAPP = "simular pagamento"
 
-# Frases naturais curtas (Aula 20.2). Não substituem os comandos exatos.
-FRASES_CATALOGO_WHATSAPP = {
+# Frases naturais já no formato de normalizar_mensagem.
+# Os comandos exatos continuam em COMANDOS_*; o webhook usa só eles.
+ALIASES_CATALOGO_WHATSAPP = {
+    "ver produtos",
+    "ver produto",
+    "mostrar produtos",
+    "mostrar produto",
+    "mostra os produtos",
+    "me mostra os produtos",
+    "me mostre os produtos",
     "quero ver os produtos",
-    "quero ver as peças",
-    "quero ver as pecas",
-    "quais produtos vocês têm",
-    "quais produtos voces tem",
-    "o que vocês têm disponível",
-    "o que voces tem disponivel",
-    "me mostre o catálogo",
+    "quero ver produtos",
+    "listar produtos",
+    "lista de produtos",
+    "ver catalogo",
+    "listar catalogo",
+    "mostrar catalogo",
+    "mostra o catalogo",
+    "me mostra o catalogo",
     "me mostre o catalogo",
+    "abre o catalogo",
+    "abrir catalogo",
+    "quero ver o catalogo",
+    "quais produtos voces tem",
+    "o que voces tem",
+    "o que tem disponivel",
+    "o que voces tem disponivel",
+    "quero ver as pecas",
+    "me mostra as pecas",
+    "ver semijoias",
+    "quero ver semijoias",
+    "mostra as joias",
+    "pode me mostrar os produtos",
+    "queria ver o catalogo",
 }
 
-FRASES_PEDIDOS_WHATSAPP = {
+ALIASES_PEDIDOS_WHATSAPP = {
+    "ver pedidos",
+    "ver meus pedidos",
+    "consultar pedido",
+    "consultar pedidos",
+    "status do pedido",
+    "acompanhar pedido",
+    "acompanhar pedidos",
+    "como esta meu pedido",
+    "como esta o meu pedido",
+    "onde esta meu pedido",
+    "ver meu pedido",
+    "ver o meu pedido",
+    "pedido pendente",
+    "pedido pago",
+    "pedido cancelado",
+    "meu pedido foi confirmado",
+    "ja confirmou meu pedido",
+    "qual o numero do pedido",
+    "historico de pedidos",
+    "ultimo pedido",
+    "acompanhar compra",
     "quero ver meus pedidos",
-    "quais são meus pedidos",
     "quais sao meus pedidos",
     "tenho algum pedido",
-    "como está meu pedido",
-    "como esta meu pedido",
 }
 
-FRASES_FINALIZAR_WHATSAPP = {
+ALIASES_FINALIZACAO_WHATSAPP = {
+    "finalizar compra",
+    "fechar pedido",
+    "concluir compra",
+    "concluir pedido",
+    "quero finalizar",
     "quero finalizar meu pedido",
+    "quero finalizar o meu pedido",
     "quero finalizar minha compra",
+    "pode finalizar",
     "pode finalizar meu pedido",
+    "vamos finalizar",
+    "fechar compra",
+    "terminar pedido",
+    "confirmar compra",
+    "confirmar pedido",
+    "finaliza pra mim",
+    "quero fechar o pedido",
     "quero fechar meu pedido",
+    "quero concluir a compra",
 }
 
-FRASES_PAGAMENTO_WHATSAPP = {
-    "como faço para pagar",
+ALIASES_PAGAMENTO_WHATSAPP = {
+    "formas de pagamento",
+    "forma de pagamento",
+    "como pagar",
+    "como eu pago",
     "como faco para pagar",
-    "qual a chave pix",
-    "qual é a chave pix",
-    "qual e a chave pix",
+    "aceita pix",
+    "pagar com pix",
+    "quero pagar",
     "quero pagar meu pedido",
+    "ir para pagamento",
+    "dados do pagamento",
+    "chave pix",
+    "manda o pix",
+    "qual a chave pix",
+    "qual chave pix",
+    "qual e a chave pix",
+    "como funciona o pix",
+    "onde pago",
+    "onde eu pago",
 }
 
 
@@ -1550,13 +1619,13 @@ def interpretar_intencao_whatsapp(mensagem):
     """
     texto = normalizar_mensagem(mensagem)
 
-    if texto in FRASES_CATALOGO_WHATSAPP:
+    if texto in COMANDOS_CATALOGO_WHATSAPP or texto in ALIASES_CATALOGO_WHATSAPP:
         intencao = "consultar_catalogo"
-    elif texto in FRASES_PEDIDOS_WHATSAPP:
+    elif texto in COMANDOS_PEDIDOS_WHATSAPP or texto in ALIASES_PEDIDOS_WHATSAPP:
         intencao = "consultar_pedidos"
-    elif texto in FRASES_FINALIZAR_WHATSAPP:
+    elif texto in COMANDOS_FINALIZAR_WHATSAPP or texto in ALIASES_FINALIZACAO_WHATSAPP:
         intencao = "iniciar_finalizacao"
-    elif texto in FRASES_PAGAMENTO_WHATSAPP:
+    elif texto in COMANDOS_PAGAMENTO_WHATSAPP or texto in ALIASES_PAGAMENTO_WHATSAPP:
         intencao = "consultar_pagamento"
     else:
         intencao = "desconhecida"
