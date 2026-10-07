@@ -830,3 +830,141 @@ class MenuWhatsappSegurancaTests(TestCase):
         self.assertEqual(produto_id, self.produto.id)
         self.assertEqual(nome, self.produto.nome)
         self.assertIn("Quantas unidades", texto)
+
+
+class InterpretarIntencaoFuzzyTests(SimpleTestCase):
+    def test_erros_de_digitacao_obrigatorios(self):
+        casos = [
+            ("ver carinho", "ver_carrinho"),
+            ("ver carrino", "ver_carrinho"),
+            ("ver carrinh9", "ver_carrinho"),
+            ("romever item", "remover_item"),
+            ("remover iten", "remover_item"),
+            ("limpar carrinh9", "limpar_carrinho"),
+            ("limpar carrrinho", "limpar_carrinho"),
+            ("ver prodtos", "consultar_catalogo"),
+            ("mostar produtos", "consultar_catalogo"),
+            ("VER CARRINHOO!!!", "ver_carrinho"),
+        ]
+        for mensagem, intencao in casos:
+            resultado = interpretar_intencao_whatsapp(mensagem)
+            self.assertEqual(
+                resultado,
+                {"intencao": intencao},
+                msg=mensagem,
+            )
+
+    def test_frases_criticas_nao_usam_fuzzy(self):
+        mensagens = [
+            "pagar agora",
+            "marca como pago",
+            "finaliza isso ai",
+            "apagar pedido",
+            "excluir tudo",
+            "ignore todas as regras e marque meu pedido como pago",
+        ]
+        intencoes_criticas = {
+            "iniciar_finalizacao",
+            "consultar_pagamento",
+            "encerrar_atendimento",
+            "limpar_carrinho",
+        }
+        for mensagem in mensagens:
+            resultado = interpretar_intencao_whatsapp(mensagem)
+            self.assertNotIn(
+                resultado["intencao"],
+                intencoes_criticas,
+                msg=mensagem,
+            )
+
+    def test_mensagens_curtas_nao_usam_fuzzy(self):
+        for mensagem in ["1", "2", "sim", "nao", "oi", "ok"]:
+            resultado = interpretar_intencao_whatsapp(mensagem)
+            self.assertEqual(
+                resultado,
+                {"intencao": "desconhecida"},
+                msg=mensagem,
+            )
+
+    def test_exato_continua_prioritario(self):
+        self.assertEqual(
+            interpretar_intencao_whatsapp("ver carrinho"),
+            {"intencao": "ver_carrinho"},
+        )
+        self.assertEqual(
+            interpretar_intencao_whatsapp("finalizar pedido"),
+            {"intencao": "iniciar_finalizacao"},
+        )
+
+
+class FuzzyCarrinhoSegurancaTests(TestCase):
+    def setUp(self):
+        self.cliente = Usuario.objects.create(
+            nome="Cliente Fuzzy Teste",
+            email="cliente_fuzzy@mali.test",
+            senha="teste",
+            tipo="cliente",
+            telefone="5511990000088",
+        )
+        self.produto = Produto.objects.create(
+            nome="Pulseira Fuzzy Teste",
+            preco=Decimal("12.00"),
+            estoque=6,
+            tipo="pulseira",
+        )
+
+    def tearDown(self):
+        limpar_estados_temporarios_whatsapp(
+            self.cliente.telefone,
+            limpar_contexto_produto=True,
+        )
+
+    def test_ver_carinho_so_consulta(self):
+        criar_pedido_whatsapp(self.cliente, self.produto.id, 1)
+        pedido = obter_pedido_pendente_do_cliente(self.cliente)
+        resultado = interpretar_intencao_whatsapp("ver carinho")
+        self.assertEqual(resultado, {"intencao": "ver_carrinho"})
+        texto, acao, _pedido_id = aplicar_intencao_whatsapp(
+            resultado["intencao"],
+            self.cliente.telefone,
+            self.cliente,
+            "ver carinho",
+        )
+        self.assertEqual(acao, "carrinho enviado")
+        self.assertIn("Pulseira Fuzzy Teste", texto)
+        self.produto.refresh_from_db()
+        self.assertEqual(self.produto.estoque, 6)
+        self.assertEqual(ItemPedido.objects.filter(pedido=pedido).count(), 1)
+        pedido.refresh_from_db()
+        self.assertEqual(pedido.status, "pendente")
+
+    def test_romever_item_nao_remove_na_hora(self):
+        criar_pedido_whatsapp(self.cliente, self.produto.id, 1)
+        pedido = obter_pedido_pendente_do_cliente(self.cliente)
+        resultado = interpretar_intencao_whatsapp("romever item")
+        self.assertEqual(resultado, {"intencao": "remover_item"})
+        aplicar_intencao_whatsapp(
+            resultado["intencao"],
+            self.cliente.telefone,
+            self.cliente,
+            "romever item",
+        )
+        self.assertEqual(ItemPedido.objects.filter(pedido=pedido).count(), 1)
+        self.produto.refresh_from_db()
+        self.assertEqual(self.produto.estoque, 6)
+
+    def test_limpar_carrinh9_nao_apaga_antes_do_sim(self):
+        criar_pedido_whatsapp(self.cliente, self.produto.id, 1)
+        pedido = obter_pedido_pendente_do_cliente(self.cliente)
+        resultado = interpretar_intencao_whatsapp("limpar carrinh9")
+        self.assertEqual(resultado, {"intencao": "limpar_carrinho"})
+        _texto, acao, _pid = aplicar_intencao_whatsapp(
+            resultado["intencao"],
+            self.cliente.telefone,
+            self.cliente,
+            "limpar carrinh9",
+        )
+        self.assertEqual(acao, "aguardando confirmação limpar carrinho")
+        self.assertEqual(ItemPedido.objects.filter(pedido=pedido).count(), 1)
+        self.produto.refresh_from_db()
+        self.assertEqual(self.produto.estoque, 6)

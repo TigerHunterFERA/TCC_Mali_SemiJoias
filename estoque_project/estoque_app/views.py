@@ -97,6 +97,7 @@ import requests
 import secrets
 import base64
 import mimetypes
+from difflib import SequenceMatcher
 from urllib.parse import quote
 
 #def validar_produto(request):
@@ -1939,7 +1940,8 @@ def interpretar_intencao_whatsapp(mensagem):
     5. estoque;
     6. detalhes;
     7. categoria (palavra no texto);
-    8. desconhecida.
+    8. aproximação controlada (fuzzy);
+    9. desconhecida.
     """
     texto = normalizar_mensagem(mensagem)
 
@@ -1976,9 +1978,94 @@ def interpretar_intencao_whatsapp(mensagem):
     elif identificar_categoria_whatsapp(texto) is not None:
         intencao = "buscar_categoria"
     else:
-        intencao = "desconhecida"
+        intencao_aproximada = encontrar_intencao_aproximada_whatsapp(texto)
+        if intencao_aproximada is not None:
+            intencao = intencao_aproximada
+        else:
+            intencao = "desconhecida"
 
     return {"intencao": intencao}
+
+
+LIMITE_SIMILARIDADE_WHATSAPP = 0.83
+TAMANHO_MINIMO_FUZZY_WHATSAPP = 5
+
+# Frases de categoria usadas só no fuzzy (já normalizadas).
+FRASES_CATEGORIA_FUZZY_WHATSAPP = {
+    "ver brincos",
+    "quero brincos",
+    "tem brinco",
+    "ver colares",
+    "quero um colar",
+    "ver pulseiras",
+    "quero pulseira",
+    "ver aneis",
+    "quero um anel",
+    "ver conjuntos",
+    "ver argolas",
+    "ver correntes",
+}
+
+
+def frases_permitidas_fuzzy_whatsapp():
+    """
+    Intenções de consulta/navegação que podem usar aproximação.
+    Finalizar, pagamento e encerrar ficam de fora de propósito.
+    """
+    return {
+        "consultar_catalogo": (
+            COMANDOS_CATALOGO_WHATSAPP | ALIASES_CATALOGO_WHATSAPP
+        ),
+        "consultar_pedidos": (
+            COMANDOS_PEDIDOS_WHATSAPP | ALIASES_PEDIDOS_WHATSAPP
+        ),
+        "buscar_categoria": FRASES_CATEGORIA_FUZZY_WHATSAPP,
+        "detalhar_produto": ALIASES_DETALHES_WHATSAPP,
+        "consultar_preco": ALIASES_PRECO_WHATSAPP,
+        "consultar_estoque": ALIASES_ESTOQUE_WHATSAPP,
+        "ver_carrinho": ALIASES_VER_CARRINHO_WHATSAPP,
+        "adicionar_carrinho": ALIASES_ADICIONAR_CARRINHO_WHATSAPP,
+        "continuar_comprando": ALIASES_CONTINUAR_COMPRANDO_WHATSAPP,
+        "remover_item": ALIASES_REMOVER_ITEM_WHATSAPP,
+        "alterar_quantidade": ALIASES_ALTERAR_QUANTIDADE_WHATSAPP,
+        "limpar_carrinho": ALIASES_LIMPAR_CARRINHO_WHATSAPP,
+        "menu_ajuda": ALIASES_MENU_AJUDA_WHATSAPP,
+    }
+
+
+def encontrar_intencao_aproximada_whatsapp(texto):
+    """
+    Compara o texto já normalizado com aliases permitidos.
+    Só devolve intenção se a similaridade for >= 0.83.
+    Textos curtos (menos de 5 caracteres) não entram no fuzzy.
+    Não acessa banco e não executa regra de negócio.
+    """
+    if texto is None:
+        return None
+    if len(texto) < TAMANHO_MINIMO_FUZZY_WHATSAPP:
+        return None
+
+    melhor_pontuacao = 0
+    melhor_intencao = None
+
+    frases_por_intencao = frases_permitidas_fuzzy_whatsapp()
+    for intencao, frases in frases_por_intencao.items():
+        for frase in frases:
+            if len(frase) < TAMANHO_MINIMO_FUZZY_WHATSAPP:
+                continue
+            pontuacao = SequenceMatcher(None, texto, frase).ratio()
+            if pontuacao > melhor_pontuacao:
+                melhor_pontuacao = pontuacao
+                melhor_intencao = intencao
+
+    if melhor_pontuacao >= LIMITE_SIMILARIDADE_WHATSAPP:
+        print("Reconhecimento aproximado:")
+        print(f"Mensagem: {texto}")
+        print(f"Intenção: {melhor_intencao}")
+        print(f"Similaridade: {melhor_pontuacao:.2f}")
+        return melhor_intencao
+
+    return None
 
 
 def validar_resultado_interpretacao_whatsapp(resultado):
