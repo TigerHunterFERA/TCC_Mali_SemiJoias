@@ -1388,6 +1388,10 @@ clientes_aguardando_nova_quantidade = {}
 # telefones aguardando SIM/NÃO para esvaziar o carrinho.
 clientes_aguardando_confirmacao_limpar_carrinho = set()
 
+# Cliente viu o menu principal e pode responder com 1 a 7.
+# Só vale quando NÃO há outro fluxo numérico ativo (produto, quantidade, carrinho).
+clientes_aguardando_menu = set()
+
 
 def validar_nome_whatsapp(nome):
     """
@@ -1773,6 +1777,50 @@ ALIASES_CONTINUAR_COMPRANDO_WHATSAPP = {
     "voltar para produtos",
 }
 
+ALIASES_MENU_AJUDA_WHATSAPP = {
+    "menu",
+    "menu principal",
+    "voltar",
+    "volta",
+    "voltar ao menu",
+    "inicio",
+    "home",
+    "ajuda",
+    "me ajuda",
+    "preciso de ajuda",
+    "opcoes",
+    "ver opcoes",
+    "mostrar opcoes",
+    "o que posso fazer",
+    "como funciona",
+    "comecar",
+    "comecar de novo",
+    "reiniciar",
+    "retornar",
+    "voltar uma etapa",
+}
+
+ALIASES_ENCERRAR_ATENDIMENTO_WHATSAPP = {
+    "encerrar",
+    "encerrar atendimento",
+    "finalizar atendimento",
+    "sair",
+    "tchau",
+    "obrigado tchau",
+    "pode encerrar",
+    "quero sair",
+    "parar atendimento",
+    "cancelar atendimento",
+    "deixa pra la",
+    "ate mais",
+    "fim",
+    "finalizar conversa",
+    "encerrar conversa",
+    "pode fechar",
+    "nao preciso mais",
+    "valeu",
+}
+
 ALIASES_CANCELAR_OPERACAO_CARRINHO_WHATSAPP = {
     "cancelar",
     "voltar",
@@ -1840,6 +1888,8 @@ INTENCOES_WHATSAPP_PERMITIDAS = {
     "alterar_quantidade",
     "limpar_carrinho",
     "continuar_comprando",
+    "menu_ajuda",
+    "encerrar_atendimento",
     "desconhecida",
 }
 
@@ -1884,11 +1934,12 @@ def interpretar_intencao_whatsapp(mensagem):
     Ordem (para não misturar preço, carrinho e categoria):
     1. catálogo, pedidos, finalização e pagamento (BLOCO 22.2);
     2. carrinho (ver, adicionar, remover, alterar, limpar, continuar);
-    3. preço;
-    4. estoque;
-    5. detalhes;
-    6. categoria (palavra no texto);
-    7. desconhecida.
+    3. menu/ajuda e encerrar atendimento;
+    4. preço;
+    5. estoque;
+    6. detalhes;
+    7. categoria (palavra no texto);
+    8. desconhecida.
     """
     texto = normalizar_mensagem(mensagem)
 
@@ -1912,6 +1963,10 @@ def interpretar_intencao_whatsapp(mensagem):
         intencao = "limpar_carrinho"
     elif texto in ALIASES_CONTINUAR_COMPRANDO_WHATSAPP:
         intencao = "continuar_comprando"
+    elif texto in ALIASES_MENU_AJUDA_WHATSAPP:
+        intencao = "menu_ajuda"
+    elif texto in ALIASES_ENCERRAR_ATENDIMENTO_WHATSAPP:
+        intencao = "encerrar_atendimento"
     elif texto in ALIASES_PRECO_WHATSAPP:
         intencao = "consultar_preco"
     elif texto in ALIASES_ESTOQUE_WHATSAPP:
@@ -1958,7 +2013,8 @@ def montar_catalogo_whatsapp():
 
     if not produtos:
         return (
-            "No momento não temos produtos disponíveis em estoque.",
+            "No momento não temos produtos disponíveis em estoque.\n"
+            "Digite MENU para ver outras opções.",
             "catálogo vazio",
             [],
         )
@@ -1975,6 +2031,7 @@ def montar_catalogo_whatsapp():
         ids.append(produto.id)
 
     linhas.append("Envie o número do produto que deseja conhecer melhor.")
+    linhas.append("Ou envie MENU para voltar.")
 
     return "\n".join(linhas).strip(), "catálogo enviado", ids
 
@@ -2008,7 +2065,8 @@ def montar_catalogo_categoria_whatsapp(chave_categoria):
 
     if not produtos:
         return (
-            f"No momento não temos {titulo.lower()} disponíveis em estoque.",
+            f"No momento não temos {titulo.lower()} disponíveis em estoque.\n"
+            "Digite MENU para ver outras opções.",
             "categoria vazia",
             [],
         )
@@ -2024,6 +2082,7 @@ def montar_catalogo_categoria_whatsapp(chave_categoria):
         ids.append(produto.id)
 
     linhas.append("Envie o número do produto que deseja conhecer melhor.")
+    linhas.append("Ou envie MENU para voltar.")
     return "\n".join(linhas).strip(), "categoria enviada", ids
 
 
@@ -2117,7 +2176,8 @@ def montar_pedidos_whatsapp(cliente):
 
     if not pedidos:
         return (
-            "Você ainda não possui pedidos cadastrados.",
+            "Você ainda não possui pedidos cadastrados.\n"
+            "Digite MENU para ver outras opções.",
             "pedidos vazios",
         )
 
@@ -2137,6 +2197,7 @@ def montar_pedidos_whatsapp(cliente):
         linhas.append(f"Total: R$ {total_texto}")
         linhas.append("")
 
+    linhas.append("Digite MENU para ver outras opções.")
     return "\n".join(linhas).strip(), "pedidos enviados"
 
 
@@ -2445,6 +2506,134 @@ def limpar_estados_operacao_carrinho_whatsapp(telefone):
     clientes_aguardando_confirmacao_limpar_carrinho.discard(telefone)
 
 
+def limpar_estados_temporarios_whatsapp(telefone, limpar_contexto_produto=False):
+    """
+    Limpa só estados em memória da conversa.
+    Não apaga Pedido, ItemPedido, estoque nem pagamento.
+    produto_em_contexto só some no encerrar, para preço/detalhes
+    continuarem válidos depois de MENU/voltar.
+    """
+    clientes_aguardando_quantidade.pop(telefone, None)
+    clientes_aguardando_confirmacao.pop(telefone, None)
+    clientes_aguardando_finalizacao.pop(telefone, None)
+    clientes_aguardando_produto.pop(telefone, None)
+    limpar_estados_operacao_carrinho_whatsapp(telefone)
+    clientes_aguardando_menu.discard(telefone)
+    if limpar_contexto_produto:
+        clientes_produto_em_contexto.pop(telefone, None)
+
+
+def telefone_em_fluxo_especifico_whatsapp(telefone):
+    """True quando um fluxo numérico/SIM-NÃO está ativo e o menu 1-7 não pode interceptar."""
+    if telefone in clientes_aguardando_quantidade:
+        return True
+    if telefone in clientes_aguardando_confirmacao:
+        return True
+    if telefone in clientes_aguardando_produto:
+        return True
+    if telefone in clientes_aguardando_finalizacao:
+        return True
+    if telefone in clientes_aguardando_remocao_carrinho:
+        return True
+    if telefone in clientes_aguardando_item_alteracao:
+        return True
+    if telefone in clientes_aguardando_nova_quantidade:
+        return True
+    if telefone in clientes_aguardando_confirmacao_limpar_carrinho:
+        return True
+    return False
+
+
+IDS_MENU_WHATSAPP = {
+    "menu_produtos": "consultar_catalogo",
+    "menu_carrinho": "ver_carrinho",
+    "menu_finalizar": "iniciar_finalizacao",
+    "menu_pedidos": "consultar_pedidos",
+    "menu_pagamento": "consultar_pagamento",
+    "menu_ajuda": "menu_ajuda",
+    "menu_encerrar": "encerrar_atendimento",
+}
+
+NUMEROS_MENU_PRINCIPAL_WHATSAPP = {
+    "1": "menu_produtos",
+    "2": "menu_carrinho",
+    "3": "menu_finalizar",
+    "4": "menu_pedidos",
+    "5": "menu_pagamento",
+    "6": "menu_ajuda",
+    "7": "menu_encerrar",
+}
+
+
+def tratar_opcao_menu_whatsapp(opcao):
+    """Converte ID estável do menu em intenção. Não executa regra de negócio."""
+    return IDS_MENU_WHATSAPP.get(opcao)
+
+
+def montar_menu_principal_whatsapp(cliente=None):
+    """Texto do menu principal. Não altera banco."""
+    linhas = []
+    if cliente is not None:
+        linhas.append(f"Olá, {cliente.nome}!")
+        linhas.append("")
+    linhas.append("Mali Semijoias")
+    linhas.append("")
+    linhas.append("Escolha uma opção:")
+    linhas.append("")
+    linhas.append("1. Ver produtos")
+    linhas.append("2. Ver carrinho")
+    linhas.append("3. Finalizar compra")
+    linhas.append("4. Meus pedidos")
+    linhas.append("5. Formas de pagamento")
+    linhas.append("6. Ajuda")
+    linhas.append("7. Encerrar atendimento")
+    linhas.append("")
+    linhas.append("Você também pode digitar normalmente.")
+    return "\n".join(linhas), "menu enviado"
+
+
+def montar_texto_ajuda_whatsapp():
+    texto_menu, _acao = montar_menu_principal_whatsapp(None)
+    texto = (
+        "Posso ajudar com produtos, carrinho, pedidos e pagamento.\n"
+        "\n"
+        + texto_menu
+    )
+    return texto, "ajuda enviada"
+
+
+def montar_encerramento_whatsapp():
+    texto = (
+        "Atendimento encerrado. Quando precisar, envie MENU para começar novamente."
+    )
+    return texto, "atendimento encerrado"
+
+
+def montar_fallback_whatsapp():
+    texto = (
+        "Não entendi essa opção.\n"
+        "\n"
+        "Digite MENU para ver o que posso fazer."
+    )
+    return texto, "mensagem desconhecida"
+
+
+def montar_saudacao_whatsapp(cliente):
+    texto = (
+        f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias.\n"
+        "\n"
+        "Você pode digitar:\n"
+        "- produtos\n"
+        "- carrinho\n"
+        "- pedidos\n"
+        "- pagamento\n"
+        "- menu\n"
+        "\n"
+        "Digite MENU para ver todas as opções."
+    )
+    return texto, "saudação enviada"
+
+
 def obter_pedido_pendente_do_cliente(cliente):
     """
     Carrinho atual = Pedido pendente mais recente do próprio cliente.
@@ -2485,7 +2674,14 @@ def montar_carrinho_whatsapp(cliente):
     pedido = obter_pedido_pendente_do_cliente(cliente)
     itens = listar_itens_carrinho(pedido)
     if not itens:
-        return "Seu carrinho está vazio.", "carrinho vazio", []
+        texto = (
+            "Seu carrinho está vazio.\n"
+            "\n"
+            "Opções:\n"
+            "- continuar comprando\n"
+            "- menu"
+        )
+        return texto, "carrinho vazio", []
 
     linhas = ["Carrinho:", ""]
     ids_itens = []
@@ -2503,6 +2699,14 @@ def montar_carrinho_whatsapp(cliente):
         ids_itens.append(item.id)
 
     linhas.append(f"Total: R$ {formatar_preco_whatsapp(total)}")
+    linhas.append("")
+    linhas.append("Opções:")
+    linhas.append("- continuar comprando")
+    linhas.append("- alterar quantidade")
+    linhas.append("- remover item")
+    linhas.append("- limpar carrinho")
+    linhas.append("- finalizar pedido")
+    linhas.append("- menu")
     return "\n".join(linhas).strip(), "carrinho enviado", ids_itens
 
 
@@ -2880,10 +3084,14 @@ def criar_pedido_whatsapp(cliente, produto_id, quantidade):
                 f"Produto: {produto.nome}\n"
                 f"Quantidade: {quantidade}\n"
                 "\n"
-                "Você pode:\n"
-                "- continuar comprando\n"
-                "- ver carrinho\n"
-                "- finalizar pedido"
+                "O que deseja fazer?\n"
+                "\n"
+                "1. Continuar comprando\n"
+                "2. Ver carrinho\n"
+                "3. Finalizar pedido\n"
+                "4. Menu principal\n"
+                "\n"
+                "Você também pode digitar: continuar comprando, ver carrinho, finalizar pedido ou menu."
             )
             return (
                 texto,
@@ -3077,6 +3285,126 @@ def interpretar_limpeza_carrinho_whatsapp(mensagem, cliente):
     return limpar_itens_carrinho_whatsapp(cliente)
 
 
+def aplicar_intencao_whatsapp(intencao, telefone, cliente, mensagem):
+    """
+    Executa uma intenção já classificada.
+    Não confirma pagamento e não baixa estoque.
+    Retorna (texto, acao, pedido_id).
+    """
+    pedido_id = None
+
+    if intencao == "consultar_catalogo" or intencao == "continuar_comprando":
+        clientes_aguardando_menu.discard(telefone)
+        limpar_estados_operacao_carrinho_whatsapp(telefone)
+        texto, acao, ids_catalogo = montar_catalogo_whatsapp()
+        if ids_catalogo:
+            clientes_aguardando_produto[telefone] = ids_catalogo
+        else:
+            clientes_aguardando_produto.pop(telefone, None)
+        return texto, acao, None
+
+    if intencao == "consultar_pedidos":
+        clientes_aguardando_menu.discard(telefone)
+        texto, acao = montar_pedidos_whatsapp(cliente)
+        return texto, acao, None
+
+    if intencao == "iniciar_finalizacao":
+        clientes_aguardando_menu.discard(telefone)
+        texto, acao, pedido_id = iniciar_finalizacao_whatsapp(cliente)
+        if pedido_id:
+            clientes_aguardando_finalizacao[telefone] = pedido_id
+        return texto, acao, pedido_id
+
+    if intencao == "consultar_pagamento":
+        clientes_aguardando_menu.discard(telefone)
+        texto, acao, pedido_id = montar_instrucoes_pagamento_whatsapp(cliente)
+        return texto, acao, pedido_id
+
+    if intencao == "buscar_categoria":
+        clientes_aguardando_menu.discard(telefone)
+        chave_categoria = identificar_categoria_whatsapp(mensagem)
+        texto, acao, ids_catalogo = montar_catalogo_categoria_whatsapp(
+            chave_categoria
+        )
+        if ids_catalogo:
+            clientes_aguardando_produto[telefone] = ids_catalogo
+        else:
+            clientes_aguardando_produto.pop(telefone, None)
+        return texto, acao, None
+
+    if intencao == "consultar_preco":
+        clientes_aguardando_menu.discard(telefone)
+        produto_id_contexto = clientes_produto_em_contexto.get(telefone)
+        texto, acao = montar_consulta_preco_whatsapp(produto_id_contexto)
+        return texto, acao, None
+
+    if intencao == "consultar_estoque":
+        clientes_aguardando_menu.discard(telefone)
+        produto_id_contexto = clientes_produto_em_contexto.get(telefone)
+        texto, acao = montar_consulta_estoque_whatsapp(produto_id_contexto)
+        return texto, acao, None
+
+    if intencao == "detalhar_produto":
+        clientes_aguardando_menu.discard(telefone)
+        produto_id_contexto = clientes_produto_em_contexto.get(telefone)
+        texto, acao = montar_detalhes_produto_whatsapp(produto_id_contexto)
+        return texto, acao, None
+
+    if intencao == "ver_carrinho":
+        clientes_aguardando_menu.discard(telefone)
+        texto, acao, _ids = montar_carrinho_whatsapp(cliente)
+        return texto, acao, None
+
+    if intencao == "adicionar_carrinho":
+        clientes_aguardando_menu.discard(telefone)
+        texto, acao = iniciar_quantidade_produto_contexto_whatsapp(telefone)
+        return texto, acao, None
+
+    if intencao == "remover_item":
+        clientes_aguardando_menu.discard(telefone)
+        limpar_estados_operacao_carrinho_whatsapp(telefone)
+        clientes_aguardando_produto.pop(telefone, None)
+        texto, acao, ids_itens = iniciar_remocao_item_carrinho_whatsapp(cliente)
+        if ids_itens:
+            clientes_aguardando_remocao_carrinho[telefone] = ids_itens
+        return texto, acao, None
+
+    if intencao == "alterar_quantidade":
+        clientes_aguardando_menu.discard(telefone)
+        limpar_estados_operacao_carrinho_whatsapp(telefone)
+        clientes_aguardando_produto.pop(telefone, None)
+        texto, acao, ids_itens = iniciar_alteracao_quantidade_carrinho_whatsapp(
+            cliente
+        )
+        if ids_itens:
+            clientes_aguardando_item_alteracao[telefone] = ids_itens
+        return texto, acao, None
+
+    if intencao == "limpar_carrinho":
+        clientes_aguardando_menu.discard(telefone)
+        limpar_estados_operacao_carrinho_whatsapp(telefone)
+        texto, acao = iniciar_limpeza_carrinho_whatsapp(cliente)
+        if acao == "aguardando confirmação limpar carrinho":
+            clientes_aguardando_confirmacao_limpar_carrinho.add(telefone)
+        return texto, acao, None
+
+    if intencao == "menu_ajuda":
+        texto, acao = montar_texto_ajuda_whatsapp()
+        clientes_aguardando_menu.add(telefone)
+        return texto, acao, None
+
+    if intencao == "encerrar_atendimento":
+        limpar_estados_temporarios_whatsapp(
+            telefone,
+            limpar_contexto_produto=True,
+        )
+        texto, acao = montar_encerramento_whatsapp()
+        return texto, acao, None
+
+    texto, acao = montar_fallback_whatsapp()
+    return texto, acao, pedido_id
+
+
 @csrf_exempt
 @require_POST
 def webhook_waha(request):
@@ -3163,6 +3491,7 @@ def webhook_waha(request):
                 clientes_aguardando_confirmacao.pop(telefone, None)
                 clientes_aguardando_finalizacao.pop(telefone, None)
                 limpar_estados_operacao_carrinho_whatsapp(telefone)
+                clientes_aguardando_menu.discard(telefone)
                 texto_resposta, acao_exibicao, ids_catalogo = (
                     montar_catalogo_whatsapp()
                 )
@@ -3170,6 +3499,25 @@ def webhook_waha(request):
                     clientes_aguardando_produto[telefone] = ids_catalogo
                 else:
                     clientes_aguardando_produto.pop(telefone, None)
+            elif mensagem_normalizada in ALIASES_MENU_AJUDA_WHATSAPP:
+                limpar_estados_temporarios_whatsapp(telefone)
+                texto_resposta, acao_exibicao, pedido_exibicao = (
+                    aplicar_intencao_whatsapp(
+                        "menu_ajuda",
+                        telefone,
+                        cliente,
+                        mensagem,
+                    )
+                )
+            elif mensagem_normalizada in ALIASES_ENCERRAR_ATENDIMENTO_WHATSAPP:
+                texto_resposta, acao_exibicao, pedido_exibicao = (
+                    aplicar_intencao_whatsapp(
+                        "encerrar_atendimento",
+                        telefone,
+                        cliente,
+                        mensagem,
+                    )
+                )
             elif telefone in clientes_aguardando_confirmacao:
                 dados_confirmacao = clientes_aguardando_confirmacao[telefone]
                 (
@@ -3340,118 +3688,29 @@ def webhook_waha(request):
                     interpretar_simulacao_pagamento_whatsapp(telefone)
                 )
             else:
-                resultado = interpretar_intencao_whatsapp(mensagem)
-                resultado = validar_resultado_interpretacao_whatsapp(resultado)
-                intencao = resultado["intencao"]
-                if intencao == "consultar_catalogo":
-                    texto_resposta, acao_exibicao, ids_catalogo = (
-                        montar_catalogo_whatsapp()
+                intencao = None
+                numero_menu = (mensagem or "").strip()
+                if (
+                    telefone in clientes_aguardando_menu
+                    and not telefone_em_fluxo_especifico_whatsapp(telefone)
+                    and numero_menu in NUMEROS_MENU_PRINCIPAL_WHATSAPP
+                ):
+                    id_opcao = NUMEROS_MENU_PRINCIPAL_WHATSAPP[numero_menu]
+                    intencao = tratar_opcao_menu_whatsapp(id_opcao)
+                if intencao is None:
+                    resultado = interpretar_intencao_whatsapp(mensagem)
+                    resultado = validar_resultado_interpretacao_whatsapp(
+                        resultado
                     )
-                    if ids_catalogo:
-                        clientes_aguardando_produto[telefone] = ids_catalogo
-                    else:
-                        clientes_aguardando_produto.pop(telefone, None)
-                elif intencao == "consultar_pedidos":
-                    texto_resposta, acao_exibicao = montar_pedidos_whatsapp(
-                        cliente
+                    intencao = resultado["intencao"]
+                texto_resposta, acao_exibicao, pedido_exibicao = (
+                    aplicar_intencao_whatsapp(
+                        intencao,
+                        telefone,
+                        cliente,
+                        mensagem,
                     )
-                elif intencao == "iniciar_finalizacao":
-                    texto_resposta, acao_exibicao, pedido_id_finalizacao = (
-                        iniciar_finalizacao_whatsapp(cliente)
-                    )
-                    if pedido_id_finalizacao:
-                        clientes_aguardando_finalizacao[telefone] = (
-                            pedido_id_finalizacao
-                        )
-                    pedido_exibicao = pedido_id_finalizacao
-                elif intencao == "consultar_pagamento":
-                    texto_resposta, acao_exibicao, pedido_exibicao = (
-                        montar_instrucoes_pagamento_whatsapp(cliente)
-                    )
-                elif intencao == "buscar_categoria":
-                    chave_categoria = identificar_categoria_whatsapp(mensagem)
-                    texto_resposta, acao_exibicao, ids_catalogo = (
-                        montar_catalogo_categoria_whatsapp(chave_categoria)
-                    )
-                    if ids_catalogo:
-                        clientes_aguardando_produto[telefone] = ids_catalogo
-                    else:
-                        clientes_aguardando_produto.pop(telefone, None)
-                elif intencao == "consultar_preco":
-                    produto_id_contexto = clientes_produto_em_contexto.get(
-                        telefone
-                    )
-                    texto_resposta, acao_exibicao = (
-                        montar_consulta_preco_whatsapp(produto_id_contexto)
-                    )
-                elif intencao == "consultar_estoque":
-                    produto_id_contexto = clientes_produto_em_contexto.get(
-                        telefone
-                    )
-                    texto_resposta, acao_exibicao = (
-                        montar_consulta_estoque_whatsapp(produto_id_contexto)
-                    )
-                elif intencao == "detalhar_produto":
-                    produto_id_contexto = clientes_produto_em_contexto.get(
-                        telefone
-                    )
-                    texto_resposta, acao_exibicao = (
-                        montar_detalhes_produto_whatsapp(produto_id_contexto)
-                    )
-                elif intencao == "ver_carrinho":
-                    texto_resposta, acao_exibicao, _ids_carrinho = (
-                        montar_carrinho_whatsapp(cliente)
-                    )
-                elif intencao == "adicionar_carrinho":
-                    texto_resposta, acao_exibicao = (
-                        iniciar_quantidade_produto_contexto_whatsapp(telefone)
-                    )
-                elif intencao == "continuar_comprando":
-                    limpar_estados_operacao_carrinho_whatsapp(telefone)
-                    texto_resposta, acao_exibicao, ids_catalogo = (
-                        montar_catalogo_whatsapp()
-                    )
-                    if ids_catalogo:
-                        clientes_aguardando_produto[telefone] = ids_catalogo
-                    else:
-                        clientes_aguardando_produto.pop(telefone, None)
-                elif intencao == "remover_item":
-                    limpar_estados_operacao_carrinho_whatsapp(telefone)
-                    clientes_aguardando_produto.pop(telefone, None)
-                    (
-                        texto_resposta,
-                        acao_exibicao,
-                        ids_itens,
-                    ) = iniciar_remocao_item_carrinho_whatsapp(cliente)
-                    if ids_itens:
-                        clientes_aguardando_remocao_carrinho[telefone] = (
-                            ids_itens
-                        )
-                elif intencao == "alterar_quantidade":
-                    limpar_estados_operacao_carrinho_whatsapp(telefone)
-                    clientes_aguardando_produto.pop(telefone, None)
-                    (
-                        texto_resposta,
-                        acao_exibicao,
-                        ids_itens,
-                    ) = iniciar_alteracao_quantidade_carrinho_whatsapp(cliente)
-                    if ids_itens:
-                        clientes_aguardando_item_alteracao[telefone] = (
-                            ids_itens
-                        )
-                elif intencao == "limpar_carrinho":
-                    limpar_estados_operacao_carrinho_whatsapp(telefone)
-                    texto_resposta, acao_exibicao = (
-                        iniciar_limpeza_carrinho_whatsapp(cliente)
-                    )
-                    if acao_exibicao == "aguardando confirmação limpar carrinho":
-                        clientes_aguardando_confirmacao_limpar_carrinho.add(
-                            telefone
-                        )
-                else:
-                    texto_resposta = (
-                        f"Olá, {cliente.nome}! Bem-vindo à Mali Semijoias."
-                    )
+                )
         elif telefone in telefones_aguardando_nome:
             nome_informado = mensagem.strip()
             if not validar_nome_whatsapp(nome_informado):
@@ -3471,7 +3730,8 @@ def webhook_waha(request):
                     cliente_exibicao = cliente.nome
                     texto_resposta = (
                         f"Cadastro concluído, {cliente.nome}! "
-                        "Bem-vindo à Mali Semijoias."
+                        "Bem-vindo à Mali Semijoias.\n"
+                        "Digite MENU para ver as opções."
                     )
                 else:
                     cliente_exibicao = "não identificado"
