@@ -1394,6 +1394,12 @@ clientes_aguardando_confirmacao_limpar_carrinho = set()
 clientes_aguardando_menu = set()
 
 
+# Estado temporário do submenu após adicionar produto ao carrinho.
+# Guarda os telefones que podem responder com as opções 1, 2, 3 ou 4.
+# Se o Django reiniciar, este conjunto será perdido.
+clientes_aguardando_opcao_carrinho = set()
+
+
 def validar_nome_whatsapp(nome):
     """
     Validação mínima do nome informado pelo WhatsApp.
@@ -3587,6 +3593,7 @@ def webhook_waha(request):
                 else:
                     clientes_aguardando_produto.pop(telefone, None)
             elif mensagem_normalizada in ALIASES_MENU_AJUDA_WHATSAPP:
+                clientes_aguardando_opcao_carrinho.discard(telefone)
                 limpar_estados_temporarios_whatsapp(telefone)
                 texto_resposta, acao_exibicao, pedido_exibicao = (
                     aplicar_intencao_whatsapp(
@@ -3597,6 +3604,7 @@ def webhook_waha(request):
                     )
                 )
             elif mensagem_normalizada in ALIASES_ENCERRAR_ATENDIMENTO_WHATSAPP:
+                clientes_aguardando_opcao_carrinho.discard(telefone)
                 texto_resposta, acao_exibicao, pedido_exibicao = (
                     aplicar_intencao_whatsapp(
                         "encerrar_atendimento",
@@ -3625,8 +3633,60 @@ def webhook_waha(request):
                     "estoque insuficiente no carrinho",
                 ):
                     clientes_aguardando_confirmacao.pop(telefone, None)
+                if acao_exibicao == "pedido criado":
+                    clientes_aguardando_opcao_carrinho.add(telefone)
                 if acao_exibicao == "produto indisponível":
                     clientes_produto_em_contexto.pop(telefone, None)
+            # Submenu exibido após adicionar produto ao carrinho.
+            elif telefone in clientes_aguardando_opcao_carrinho:
+
+                opcoes_carrinho = {
+                    "1": "continuar_comprando",
+                    "2": "ver_carrinho",
+                    "3": "iniciar_finalizacao",
+                    "4": "menu_ajuda",
+                }
+
+                intencao = opcoes_carrinho.get(mensagem_normalizada)
+
+                # Também aceita comandos escritos pelo cliente.
+                if intencao is None:
+                    resultado = interpretar_intencao_whatsapp(mensagem)
+                    resultado = validar_resultado_interpretacao_whatsapp(
+                        resultado
+                    )
+                    intencao = resultado["intencao"]
+
+                intencoes_permitidas = {
+                    "continuar_comprando",
+                    "consultar_catalogo",
+                    "ver_carrinho",
+                    "iniciar_finalizacao",
+                    "menu_ajuda",
+                }
+
+                if intencao in intencoes_permitidas:
+                    clientes_aguardando_opcao_carrinho.discard(telefone)
+
+                    texto_resposta, acao_exibicao, pedido_exibicao = (
+                        aplicar_intencao_whatsapp(
+                            intencao,
+                            telefone,
+                            cliente,
+                            mensagem,
+                        )
+                    )
+                else:
+                    texto_resposta = (
+                        "Não entendi essa opção.\n\n"
+                        "Escolha uma opção:\n"
+                        "1. Continuar comprando\n"
+                        "2. Ver carrinho\n"
+                        "3. Finalizar pedido\n"
+                        "4. Menu principal"
+                    )
+                    acao_exibicao = "opção inválida do carrinho"
+
             elif telefone in clientes_aguardando_quantidade:
                 produto_id = clientes_aguardando_quantidade[telefone]
                 (

@@ -27,9 +27,14 @@ SECRET_KEY = 'django-insecure-7t$f@u#q0#iv_n8rsc2ud6-(dk52i65*r81f-pd@w$98_q53!c
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "host.docker.internal"]
+# ALLOWED_HOSTS = ["localhost", "127.0.0.1", "host.docker.internal"]
 
-
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "host.docker.internal",
+    "hurler-xerox-borrowing.ngrok-free.dev",
+]
 # Application definition
 
 INSTALLED_APPS = [
@@ -97,7 +102,7 @@ WSGI_APPLICATION = 'estoque_project.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'chatbot_mali_semijoias',
+        'NAME': 'chatbot_mali_semijoias_vscode',
         'USER': 'root',
         'PASSWORD': '',
         'HOST': 'localhost',
